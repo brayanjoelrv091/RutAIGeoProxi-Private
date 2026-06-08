@@ -80,6 +80,11 @@ def get_current_user(
                 detail="Tu cuenta de empresa ha sido suspendida. Contacta a soporte para regularizar tu suscripción.",
             )
             
+    # CU-28: Inyectar variables en contexto para el filtrado a nivel de ORM
+    from app.shared.context import current_tenant_id, is_superadmin
+    current_tenant_id.set(user.tenant_id)
+    is_superadmin.set(user.rol == "admin" and user.tenant_id is None)
+            
     return user
 
 
@@ -139,4 +144,15 @@ def require_tenant_access(target_tenant_id: int):
             )
         return user
     return _dep
+
+
+# ── Guard por SuperAdmin Global ─────────────────────────────────────
+def get_current_superadmin(user=Depends(get_current_user)):
+    """Valida que el usuario sea estrictamente un SuperAdmin Global (sin tenant_id)."""
+    if user.rol != "admin" or user.tenant_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado: Se requieren privilegios de Super-Admin Global."
+        )
+    return user
 

@@ -28,7 +28,12 @@ class OfflineIncident {
   final double longitud;
   final String? direccion;
   final String createdAtLocal;
-  bool synced;
+  final String tipoBusqueda;
+  final int? tallerPreferidoId;
+  final List<String>? imagePaths;
+  final String? audioPath;
+  bool isSyncPending;
+  bool hasSyncError;
 
   OfflineIncident({
     required this.idempotencyKey,
@@ -38,7 +43,12 @@ class OfflineIncident {
     required this.longitud,
     this.direccion,
     required this.createdAtLocal,
-    this.synced = false,
+    this.tipoBusqueda = 'general',
+    this.tallerPreferidoId,
+    this.imagePaths,
+    this.audioPath,
+    this.isSyncPending = true,
+    this.hasSyncError = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -49,7 +59,12 @@ class OfflineIncident {
     'longitud': longitud,
     'direccion': direccion,
     'created_at_local': createdAtLocal,
-    'synced': synced,
+    'tipo_busqueda': tipoBusqueda,
+    'taller_preferido_id': tallerPreferidoId,
+    'image_paths': imagePaths,
+    'audio_path': audioPath,
+    'is_sync_pending': isSyncPending,
+    'has_sync_error': hasSyncError,
   };
 
   factory OfflineIncident.fromJson(Map<String, dynamic> json) => OfflineIncident(
@@ -60,7 +75,12 @@ class OfflineIncident {
     longitud: (json['longitud'] as num).toDouble(),
     direccion: json['direccion'],
     createdAtLocal: json['created_at_local'],
-    synced: json['synced'] ?? false,
+    tipoBusqueda: json['tipo_busqueda'] ?? 'general',
+    tallerPreferidoId: json['taller_preferido_id'],
+    imagePaths: (json['image_paths'] as List<dynamic>?)?.map((e) => e as String).toList(),
+    audioPath: json['audio_path'],
+    isSyncPending: json['is_sync_pending'] ?? true, // Por defecto al cargar, asumimos true si no está
+    hasSyncError: json['has_sync_error'] ?? false,
   );
 }
 
@@ -86,10 +106,10 @@ class OfflineQueue {
     return decoded.map((e) => OfflineIncident.fromJson(e)).toList();
   }
 
-  /// Obtiene solo los incidentes pendientes de sincronización.
+  /// Obtiene solo los incidentes pendientes de sincronización (ignorando los que tienen errores de conflicto).
   static Future<List<OfflineIncident>> getPending() async {
     final queue = await getQueue();
-    return queue.where((item) => !item.synced).toList();
+    return queue.where((item) => item.isSyncPending && !item.hasSyncError).toList();
   }
 
   /// Marca un incidente como sincronizado por su idempotency_key.
@@ -99,7 +119,21 @@ class OfflineQueue {
 
     for (final item in queue) {
       if (item.idempotencyKey == idempotencyKey) {
-        item.synced = true;
+        item.isSyncPending = false;
+      }
+    }
+
+    await _save(prefs, queue);
+  }
+
+  /// Marca un incidente con error de conflicto (ej. hash corrupto).
+  static Future<void> markError(String idempotencyKey) async {
+    final prefs = await SharedPreferences.getInstance();
+    final queue = await getQueue();
+
+    for (final item in queue) {
+      if (item.idempotencyKey == idempotencyKey) {
+        item.hasSyncError = true;
       }
     }
 
@@ -110,7 +144,7 @@ class OfflineQueue {
   static Future<void> clearSynced() async {
     final prefs = await SharedPreferences.getInstance();
     final queue = await getQueue();
-    final pending = queue.where((item) => !item.synced).toList();
+    final pending = queue.where((item) => item.isSyncPending).toList();
     await _save(prefs, pending);
   }
 

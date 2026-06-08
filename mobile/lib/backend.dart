@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import 'config.dart';
 import 'session.dart';
@@ -180,6 +181,8 @@ class Backend {
     File? audio,
     String tipoBusqueda = 'general',
     int? tallerPreferidoId,
+    String? syncHash,
+    String? localTimestamp,
   }) async {
     final request = http.MultipartRequest('POST', _uri('/incidents'));
     request.headers.addAll(await _headers(withAuth: true));
@@ -191,6 +194,12 @@ class Backend {
     if (tallerPreferidoId != null) {
       request.fields['taller_preferido_id'] = tallerPreferidoId.toString();
     }
+    if (syncHash != null) {
+      request.fields['sync_hash'] = syncHash;
+    }
+    if (localTimestamp != null) {
+      request.fields['local_timestamp'] = localTimestamp;
+    }
     if (description != null && description.isNotEmpty) {
       request.fields['descripcion'] = description;
     }
@@ -201,23 +210,35 @@ class Backend {
     if (images != null) {
       for (var img in images) {
         request.files.add(
-          await http.MultipartFile.fromPath('fotos', img.path),
+          await http.MultipartFile.fromPath(
+            'fotos',
+            img.path,
+            contentType: MediaType('image', 'jpeg'),
+          ),
         );
       }
     }
     if (audio != null) {
       request.files.add(
-        await http.MultipartFile.fromPath('audio', audio.path),
+        await http.MultipartFile.fromPath(
+          'audio',
+          audio.path,
+          contentType: MediaType('audio', 'm4a'), // o el formato que grabe el plugin
+        ),
       );
     }
 
     final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
 
-    if (response.statusCode == 201) return null;
+    if (response.statusCode == 201 || response.statusCode == 200) return null;
     try {
       final error = jsonDecode(response.body);
-      return error['detail']?.toString() ?? 'Error ${response.statusCode}';
+      final detail = error['detail']?.toString();
+      if (response.statusCode == 400 && detail != null && detail.contains('Hash corrupto')) {
+        return detail;
+      }
+      return detail ?? 'Error ${response.statusCode}';
     } catch (_) {}
     return 'Error ${response.statusCode}';
   }

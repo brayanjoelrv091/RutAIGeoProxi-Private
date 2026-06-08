@@ -95,7 +95,14 @@ export class TenantFormComponent implements OnInit {
         this.loading = false;
         this.router.navigate(['/tenants']);
       },
-      error: (err) => { this.error = err.error?.detail || 'Error creando'; this.loading = false; }
+      error: (err) => { 
+        if (err.status === 409 || err.status === 400) {
+            this.error = err.error?.detail || 'El dominio ya existe. Por favor, intenta con otro.';
+        } else {
+            this.error = err.error?.detail || 'Error crítico creando el tenant.';
+        }
+        this.loading = false; 
+      }
       });
     }
   }

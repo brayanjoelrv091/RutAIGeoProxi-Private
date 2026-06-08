@@ -10,6 +10,8 @@ from app.modules.p1_usuarios.models import Usuario
 from app.modules.p9_analitica.schemas import (
     DashboardKPIs,
     CotizacionOut,
+    CotizacionCreateManual,
+    CotizacionRespuesta,
     TiempoEstimadoOut
 )
 from app.modules.p9_analitica.services import DashboardService, CotizacionService, EstimacionService
@@ -42,7 +44,7 @@ def get_estimacion(
     return EstimacionService.calcular_tiempo_estimado(db, incident_id)
 
 
-@router.post("/quotations/{incident_id}", response_model=CotizacionOut, status_code=status.HTTP_201_CREATED, summary="CU30 · Generar Cotización")
+@router.post("/quotations/{incident_id}", response_model=CotizacionOut, status_code=status.HTTP_201_CREATED, summary="Generar Cotización IA")
 def generar_cotizacion(
     incident_id: int,
     db: Session = Depends(get_db),
@@ -51,6 +53,26 @@ def generar_cotizacion(
     """Genera una cotización detallada basándose en el análisis de IA del incidente."""
     return CotizacionService.generar_cotizacion_desde_ia(db, incident_id)
 
+@router.post("/quotations_manual", response_model=CotizacionOut, status_code=status.HTTP_201_CREATED, summary="CU30 · Generar Cotización Manual")
+def crear_cotizacion_manual(
+    schema: CotizacionCreateManual,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("taller", "admin")),
+):
+    """Crea una cotización manual con cálculo financiero estricto y notifica al cliente."""
+    return CotizacionService.crear_cotizacion_manual(db, schema, current_user.tenant_id)
+
+
+@router.patch("/quotations/{cotizacion_id}/respuesta", response_model=CotizacionOut, summary="CU30 · Responder Cotización")
+def responder_cotizacion(
+    cotizacion_id: int,
+    schema: CotizacionRespuesta,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("cliente", "admin")),
+):
+    """El cliente acepta, rechaza o solicita ajuste. Valida timeout."""
+    return CotizacionService.responder_cotizacion(db, cotizacion_id, schema.estado, schema.notas)
+
 
 @router.get("/quotations/{cotizacion_id}", response_model=CotizacionOut, summary="Ver detalle de Cotización")
 def get_cotizacion(
@@ -58,5 +80,6 @@ def get_cotizacion(
     db: Session = Depends(get_db),
     _current: Usuario = Depends(get_current_user),
 ):
+    return CotizacionService.get_cotizacion(db, cotizacion_id)
     """Obtiene los detalles y desgloses de una cotización."""
     return CotizacionService.get_cotizacion(db, cotizacion_id)

@@ -57,12 +57,17 @@ class Incidente(Base):
     categoria = Column(String(50), nullable=True)    # mecanico | electrico | carroceria | ...
     tipo_busqueda = Column(String(30), default="general", nullable=False) # general | categoria | preferido
     taller_preferido_id = Column(Integer, ForeignKey("talleres.id", ondelete="SET NULL"), nullable=True, index=True)
+    tiempo_estimado_reparacion_minutos = Column(Integer, nullable=True) # CU-32: ETA dinámico
     idempotency_key = Column(
         String(64),
         unique=True,
         nullable=True,
         index=True,
     )  # CU-23: UUID generado por el cliente para deduplicación offline
+    creado_en_local = Column(
+        DateTime(timezone=True),
+        nullable=True,
+    )  # CU-23: Timestamp generado localmente por el dispositivo offline
     creado_en = Column(
         DateTime(timezone=True),
         nullable=False,

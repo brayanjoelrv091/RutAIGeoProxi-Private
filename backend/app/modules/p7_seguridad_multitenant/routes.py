@@ -5,7 +5,7 @@ P7 — Rutas de Administración Multi-Tenant.
 from fastapi import APIRouter, Depends, status, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
-from app.shared.deps import get_current_user, get_db, require_roles
+from app.shared.deps import get_current_user, get_db, require_roles, get_current_superadmin
 from app.modules.p1_usuarios.models import Usuario
 from app.modules.p7_seguridad_multitenant.schemas import (
     TenantCreate,
@@ -20,14 +20,12 @@ from app.modules.p7_seguridad_multitenant.services import TenantService
 
 router = APIRouter(prefix="/tenants", tags=["P7 · Seguridad Multi-Tenant"])
 
-admin_dep = require_roles("admin")
-
 @router.post("", response_model=TenantOut, status_code=status.HTTP_201_CREATED, summary="Crear un nuevo Tenant")
 def create_tenant(
     schema: TenantCreate,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    _current: Usuario = Depends(admin_dep),
+    _current: Usuario = Depends(get_current_superadmin),
 ):
     """CU29 · Administrador global crea una nueva organización."""
     return TenantService.create_tenant(db, schema, background_tasks)
@@ -38,7 +36,7 @@ def list_tenants(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    _current: Usuario = Depends(admin_dep),
+    _current: Usuario = Depends(get_current_superadmin),
 ):
     return TenantService.get_tenants(db, skip, limit)
 
@@ -57,7 +55,7 @@ def update_tenant(
     tenant_id: int,
     schema: TenantUpdate,
     db: Session = Depends(get_db),
-    _current: Usuario = Depends(admin_dep),
+    _current: Usuario = Depends(get_current_superadmin),
 ):
     return TenantService.update_tenant(db, tenant_id, schema)
 

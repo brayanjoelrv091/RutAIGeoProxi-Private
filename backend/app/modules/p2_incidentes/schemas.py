@@ -22,6 +22,12 @@ class IncidentCreate(BaseModel):
     taller_preferido_id: int | None = Field(default=None)
 
 
+class EstadoUpdate(BaseModel):
+    """Payload para actualizar el estado del incidente."""
+    estado: str = Field(..., max_length=30)
+
+
+
 class MediaOut(BaseModel):
     id: int
     incidente_id: int

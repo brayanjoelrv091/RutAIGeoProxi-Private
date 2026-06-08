@@ -31,34 +31,71 @@ class IncidentService:
         db: Session,
         user_id: int,
         payload: IncidentCreate,
+        sync_hash: str | None = None,
+        local_timestamp: str | None = None,
         fotos: list[UploadFile] | None = None,
         audio: UploadFile | None = None,
         background_tasks: BackgroundTasks | None = None,
     ) -> Incidente:
         """
         CU7 — Reportar incidente con fotos, audio y ubicación GPS.
-        Ejecuta clasificación automática (CU8) tras la creación.
+        CU-23 — Deduplicación offline.
         """
+        from datetime import datetime
+        from fastapi import HTTPException
+        
         # Obtener tenant_id del usuario
         from app.modules.p1_usuarios.models import Usuario
         user = db.query(Usuario).filter(Usuario.id == user_id).first()
         tenant_id = user.tenant_id if user else None
 
-        # 1. Crear incidente
-        incidente = Incidente(
-            usuario_id=user_id,
-            tenant_id=tenant_id,
-            titulo=payload.titulo,
-            descripcion=payload.descripcion,
-            latitud=payload.latitud,
-            longitud=payload.longitud,
-            direccion=payload.direccion,
-            estado="nuevo",
-            tipo_busqueda=payload.tipo_busqueda,
-            taller_preferido_id=payload.taller_preferido_id,
-        )
-        db.add(incidente)
-        db.flush()  # Obtener ID sin commit
+        # 1. Deduplicación y Manejo de Conflictos (CU-23)
+        dt_local = None
+        incidente = None
+        if sync_hash:
+            if not local_timestamp:
+                raise HTTPException(status_code=400, detail="Hash corrupto o Timestamp inválido")
+            try:
+                dt_local = datetime.fromisoformat(local_timestamp.replace("Z", "+00:00"))
+            except Exception:
+                raise HTTPException(status_code=400, detail="Hash corrupto o Timestamp inválido")
+
+            existente = db.query(Incidente).filter(Incidente.idempotency_key == sync_hash).first()
+            if existente:
+                if existente.creado_en_local and dt_local <= existente.creado_en_local:
+                    # El registro local es más antiguo o igual al que ya tenemos, ignorar (Devolver HTTP 200/201).
+                    return existente
+                
+                # Es más reciente: Actualizar el registro existente
+                existente.titulo = payload.titulo
+                existente.descripcion = payload.descripcion
+                existente.latitud = payload.latitud
+                existente.longitud = payload.longitud
+                existente.direccion = payload.direccion
+                existente.tipo_busqueda = payload.tipo_busqueda
+                existente.taller_preferido_id = payload.taller_preferido_id
+                existente.creado_en_local = dt_local
+                incidente = existente
+
+        if not incidente:
+            # 1. Crear nuevo incidente
+            incidente = Incidente(
+                usuario_id=user_id,
+                tenant_id=tenant_id,
+                titulo=payload.titulo,
+                descripcion=payload.descripcion,
+                latitud=payload.latitud,
+                longitud=payload.longitud,
+                direccion=payload.direccion,
+                estado="nuevo",
+                tipo_busqueda=payload.tipo_busqueda,
+                taller_preferido_id=payload.taller_preferido_id,
+                idempotency_key=sync_hash,
+                creado_en_local=dt_local,
+            )
+            db.add(incidente)
+
+        db.flush()  # Obtener ID sin commit o actualizar BD
 
         # 2. Subir fotos
         image_local_paths: list[str] = []
@@ -329,3 +366,221 @@ class IncidentService:
             query = TenantFilterService.apply_tenant_filter(query, Incidente, tenant_id)
         incidentes = query.all()
         return [{"lat": i.latitud, "lng": i.longitud, "severidad": i.severidad} for i in incidentes]
+
+    @staticmethod
+    async def update_estado(db: Session, incident_id: int, nuevo_estado: str, tenant_id: int | None = None) -> dict:
+        """CU-25: Cambiar el estado del incidente con validación y broadcast."""
+        from fastapi import HTTPException
+        from app.shared.websockets import manager
+
+        incidente = db.query(Incidente).filter(Incidente.id == incident_id).first()
+        if not incidente:
+            raise HTTPException(status_code=404, detail="Incidente no encontrado")
+            
+        # Validación Multi-Tenant
+        if tenant_id is not None and incidente.tenant_id != tenant_id:
+            raise HTTPException(status_code=403, detail="No tienes permisos sobre este incidente")
+
+        estado_actual = incidente.estado
+
+        # Transiciones permitidas
+        transiciones = {
+            "pendiente": ["buscando_taller", "cancelado", "clasificado"],
+            "nuevo": ["buscando_taller", "cancelado", "clasificado"],
+            "clasificado": ["buscando_taller", "cancelado"],
+            "buscando_taller": ["taller_asignado", "cancelado"],
+            "taller_asignado": ["en_camino", "cancelado"],
+            "en_camino": ["en_atencion", "cancelado"],
+            "en_atencion": ["finalizado", "cancelado"],
+            "finalizado": [],
+            "cancelado": []
+        }
+
+        # Permitir que el Taller u Operador avance el estado lógicamente
+        permitidos = transiciones.get(estado_actual, [])
+        if nuevo_estado not in permitidos:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Transición inválida: No se puede pasar de '{estado_actual}' a '{nuevo_estado}'"
+            )
+
+        # Actualizar en BD
+        incidente.estado = nuevo_estado
+        db.commit()
+        db.refresh(incidente)
+
+        # CU-32: ETA Dinámico cuando entra a "en_atencion"
+        if nuevo_estado == "en_atencion":
+            await IncidentService.calcular_eta_reparacion(db, incident_id)
+
+        # Broadcast via WebSockets
+        room_id = f"tenant_{incidente.tenant_id or 'global'}_incidente_{incident_id}"
+        await manager.broadcast_to_room(
+            room_id,
+            {
+                "type": "ESTADO_UPDATED", 
+                "incidente_id": incident_id, 
+                "nuevo_estado": nuevo_estado
+            }
+        )
+
+        return {"status": "ok", "estado": nuevo_estado}
+
+    @staticmethod
+    async def calcular_eta_reparacion(db: Session, incidente_id: int) -> int:
+        """CU-32: Calcular y notificar el ETA de reparación."""
+        from sqlalchemy import func
+        from app.shared.websocket_manager import manager
+        
+        incidente = db.query(Incidente).filter(Incidente.id == incidente_id).first()
+        if not incidente or not incidente.tenant_id:
+            return 60
+
+        # 1. Historial (Promedio de minutos)
+        # Aproximación: extraer el historial de 'finalizado' no está directo por timestamp en este diseño simplificado,
+        # así que calcularemos usando el campo de 'creado_en' vs 'actualizado_en' si la DB lo soporta.
+        # Para evitar funciones específicas de DB en SQLite/Postgres mezcladas, usamos el promedio de una subquery
+        # de los incidentes que están 'finalizado'
+        # Usamos extract epoch en PostgreSQL, fallback a un número estático
+        try:
+            # Consulta SQL estricta asumiendo PostgreSQL: EXTRACT(EPOCH FROM (actualizado_en - creado_en)) / 60
+            query = db.query(func.avg(
+                func.extract('epoch', Incidente.actualizado_en - Incidente.creado_en) / 60
+            )).filter(
+                Incidente.tenant_id == incidente.tenant_id,
+                Incidente.categoria == incidente.categoria,
+                Incidente.estado == "finalizado"
+            )
+            promedio_hist = query.scalar()
+            base_minutos = float(promedio_hist) if promedio_hist else 60.0
+        except Exception:
+            base_minutos = 60.0
+
+        # 2. Complejidad (Multiplicador IA)
+        multiplicador_ia = 1.0
+        clasificacion = db.query(ClasificacionIncidente).filter(ClasificacionIncidente.incidente_id == incidente_id).first()
+        if clasificacion:
+            sev = clasificacion.severidad.lower() if clasificacion.severidad else ""
+            if sev == "moderado": multiplicador_ia = 1.2
+            elif sev == "grave": multiplicador_ia = 1.5
+            elif sev == "critico": multiplicador_ia = 2.0
+
+        # 3. Carga de Trabajo (Workload)
+        workload = db.query(func.count(Incidente.id)).filter(
+            Incidente.tenant_id == incidente.tenant_id,
+            Incidente.estado == "en_atencion"
+        ).scalar() or 0
+        
+        # Fórmula
+        multiplicador_workload = 1.0 + (workload * 0.10)
+        eta_final = int(base_minutos * multiplicador_ia * multiplicador_workload)
+        
+        # Guardar en BD
+        incidente.tiempo_estimado_reparacion_minutos = eta_final
+        db.commit()
+        db.refresh(incidente)
+
+        # Emitir WS
+        room_id = f"tenant_{incidente.tenant_id}_incidente_{incidente_id}"
+        await manager.broadcast_to_room(room_id, {
+            "type": "tiempo_reparacion_actualizado",
+            "eta_minutos": eta_final
+        })
+        
+        return eta_final
+
+    @staticmethod
+    def _timeout_asignacion(db: Session, incidente_id: int, taller_tenant_id: int):
+        """CU-31: Fallback tras 5 minutos de no respuesta del taller."""
+        from app.shared.websocket_manager import manager
+        import asyncio
+        
+        incidente = db.query(Incidente).filter(Incidente.id == incidente_id).first()
+        if not incidente:
+            return
+            
+        # Si sigue en "taller_asignado", significa que el taller nunca lo aceptó (nunca pasó a "en_camino" o "proceso")
+        if incidente.estado == "taller_asignado":
+            incidente.estado = "buscando_taller"
+            incidente.tenant_id = None  # Quitar asignación
+            db.commit()
+            
+            # Emitir websocket al taller para que desaparezca
+            room_id = f"tenant_{taller_tenant_id}"
+            payload = {
+                "type": "servicio_cancelado_timeout",
+                "data": {"incidente_id": incidente_id}
+            }
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(manager.broadcast_to_room(room_id, payload))
+                else:
+                    loop.run_until_complete(manager.broadcast_to_room(room_id, payload))
+            except Exception:
+                pass
+
+    @staticmethod
+    def asignar_taller(
+        db: Session, 
+        incidente_id: int, 
+        taller_id: int, 
+        background_tasks: BackgroundTasks
+    ) -> Incidente:
+        """CU-31: Asignar incidente a un taller."""
+        from app.modules.p3_talleres.models import Taller
+        from app.shared.websocket_manager import manager
+        import asyncio
+        
+        incidente = db.query(Incidente).filter(Incidente.id == incidente_id).first()
+        if not incidente:
+            raise HTTPException(status_code=404, detail="Incidente no encontrado")
+            
+        if incidente.estado not in ["pendiente", "buscando_taller"]:
+            raise HTTPException(status_code=400, detail=f"No se puede asignar un taller en estado '{incidente.estado}'")
+            
+        taller = db.query(Taller).filter(Taller.id == taller_id).first()
+        if not taller:
+            raise HTTPException(status_code=404, detail="Taller no encontrado")
+            
+        # 1. Transferencia de propiedad (Tenant)
+        incidente.estado = "taller_asignado"
+        incidente.tenant_id = taller.tenant_id
+        db.commit()
+        db.refresh(incidente)
+        
+        # 2. WebSocket Push al canal del Taller (Tenant)
+        room_id = f"tenant_{taller.tenant_id}"
+        payload = {
+            "type": "nuevo_servicio_asignado",
+            "data": {
+                "incidente_id": incidente.id,
+                "latitud": incidente.latitud,
+                "longitud": incidente.longitud,
+                "titulo": incidente.titulo
+            }
+        }
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(manager.broadcast_to_room(room_id, payload))
+            else:
+                loop.run_until_complete(manager.broadcast_to_room(room_id, payload))
+        except Exception:
+            pass
+            
+        # 3. Fallback Machine State (5 mins)
+        import time
+        async def delayed_fallback():
+            await asyncio.sleep(300) # 5 minutos
+            # Usar una nueva sesión de DB para el background task
+            from app.shared.database import SessionLocal
+            db_bg = SessionLocal()
+            try:
+                IncidentService._timeout_asignacion(db_bg, incidente_id, taller.tenant_id)
+            finally:
+                db_bg.close()
+                
+        background_tasks.add_task(lambda: asyncio.create_task(delayed_fallback()))
+        
+        return incidente

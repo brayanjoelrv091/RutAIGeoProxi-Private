@@ -9,7 +9,7 @@ Tablas:
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, DateTime, Numeric, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.shared.database import Base
@@ -28,8 +28,8 @@ class KPISnapshot(Base):
         index=True,
     )
     total_incidentes = Column(Integer, nullable=False, default=0)
-    tiempo_promedio_asignacion_min = Column(Float, nullable=False, default=0.0)
-    tiempo_promedio_resolucion_min = Column(Float, nullable=False, default=0.0)
+    tiempo_promedio_asignacion_min = Column(Numeric(10, 2), nullable=False, default=0.0)
+    tiempo_promedio_resolucion_min = Column(Numeric(10, 2), nullable=False, default=0.0)
     incidentes_completados = Column(Integer, nullable=False, default=0)
     incidentes_cancelados = Column(Integer, nullable=False, default=0)
     fecha_snapshot = Column(
@@ -40,7 +40,7 @@ class KPISnapshot(Base):
 
 
 class Cotizacion(Base):
-    """CU30 · Cotización de reparación generada a partir de IA."""
+    """CU30 · Cotización de reparación generada manual o por IA."""
 
     __tablename__ = "cotizaciones"
 
@@ -57,12 +57,16 @@ class Cotizacion(Base):
         nullable=True,
         index=True,
     )
-    subtotal = Column(Float, nullable=False, default=0.0)
-    iva = Column(Float, nullable=False, default=0.0)
-    total = Column(Float, nullable=False, default=0.0)
-    estado = Column(String(30), nullable=False, default="borrador")  # borrador | enviada | aceptada | rechazada
+    subtotal = Column(Numeric(10, 2), nullable=False, default=0.0)
+    iva = Column(Numeric(10, 2), nullable=False, default=0.0)
+    total = Column(Numeric(10, 2), nullable=False, default=0.0)
+    estado = Column(String(30), nullable=False, default="borrador")  # borrador | enviada | aceptada | rechazada | ajuste_solicitado
     notas = Column(Text, nullable=True)
     tiempo_estimado_dias = Column(Integer, nullable=True)  # CU-32
+    
+    # CU-30 Expiración
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    
     creado_en = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -92,7 +96,7 @@ class CotizacionItem(Base):
     )
     descripcion = Column(String(300), nullable=False)
     cantidad = Column(Integer, nullable=False, default=1)
-    precio_unitario = Column(Float, nullable=False, default=0.0)
+    precio_unitario = Column(Numeric(10, 2), nullable=False, default=0.0)
 
     # ── Relaciones ──
     cotizacion = relationship("Cotizacion", back_populates="items")

@@ -33,12 +33,15 @@ class TiempoEstimadoOut(BaseModel):
     rango_dias: str
     razonamiento: str
 
+from decimal import Decimal
+from pydantic import BaseModel, Field
+
 # ── Cotizaciones (CU-30) ──
 
 class CotizacionItemBase(BaseModel):
     descripcion: str
     cantidad: int = Field(ge=1)
-    precio_unitario: float = Field(ge=0.0)
+    precio_unitario: Decimal = Field(ge=Decimal("0.0"))
 
 class CotizacionItemCreate(CotizacionItemBase):
     pass
@@ -48,6 +51,11 @@ class CotizacionItemOut(CotizacionItemBase):
     
     model_config = {"from_attributes": True}
 
+class CotizacionCreateManual(BaseModel):
+    incidente_id: int
+    notas: str | None = None
+    items: list[CotizacionItemCreate] = Field(min_length=1)
+
 class CotizacionCreate(BaseModel):
     incidente_id: int
     notas: str | None = None
@@ -56,16 +64,21 @@ class CotizacionUpdate(BaseModel):
     estado: str  # borrador | enviada | aceptada | rechazada
     notas: str | None = None
 
+class CotizacionRespuesta(BaseModel):
+    estado: str = Field(..., description="ACEPTADA, RECHAZADA, o AJUSTE_SOLICITADO")
+    notas: str | None = None
+
 class CotizacionOut(BaseModel):
     id: int
     incidente_id: int
     tenant_id: int | None
-    subtotal: float
-    iva: float
-    total: float
+    subtotal: Decimal
+    iva: Decimal
+    total: Decimal
     estado: str
     notas: str | None
     tiempo_estimado_dias: int | None
+    expires_at: datetime | None
     creado_en: datetime
     actualizado_en: datetime | None
     items: list[CotizacionItemOut]

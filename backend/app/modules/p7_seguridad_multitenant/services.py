@@ -19,6 +19,25 @@ from fastapi import BackgroundTasks
 class TenantService:
     @staticmethod
     def create_tenant(db: Session, schema: TenantCreate, background_tasks: BackgroundTasks = None) -> Tenant:
+        import re
+        from fastapi import BackgroundTasks
+        
+        # 1. Validación Estricta de Subdominio (CU-29)
+        if schema.dominio:
+            if not re.match(r"^[a-z0-9\-]+$", schema.dominio):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El dominio solo puede contener letras minúsculas, números y guiones."
+                )
+            
+            # Verificar si ya existe
+            existe = db.query(Tenant).filter(Tenant.dominio == schema.dominio).first()
+            if existe:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"El dominio '{schema.dominio}' ya está en uso."
+                )
+
         # Extraemos campos que no van al modelo Tenant
         schema_dict = schema.model_dump(exclude={"email_admin", "dominio", "estado", "metodo_pago", "monto_pago"})
         email_admin = schema.email_admin
@@ -37,12 +56,12 @@ class TenantService:
         schema_dict["estado_pago"] = estado_pago
         schema_dict["monto_pago"] = monto_pago
         schema_dict["metodo_pago"] = metodo_pago
+        schema_dict["dominio"] = schema.dominio
         
         db_tenant = Tenant(**schema_dict)
         try:
             db.add(db_tenant)
-            db.commit()
-            db.refresh(db_tenant)
+            db.flush()  # <--- CU-29: Flusheamos para obtener db_tenant.id, NO commit
             
             # Si es pago por tarjeta (Stripe en línea), generar sesión
             if metodo_pago == "tarjeta" and estado_pago == "pendiente":
@@ -71,9 +90,10 @@ class TenantService:
                         client_reference_id=str(db_tenant.id)
                     )
                     db_tenant.checkout_url = session.url
-                    db.commit()
+                    db.flush()
                 except Exception as e:
                     print(f"Error en Stripe: {e}")
+                    raise HTTPException(status_code=500, detail="Error de conexión con la pasarela de pago.")
             
             # Crear historial si hubo pago manual presencial
             elif estado_pago == "pagado":
@@ -89,9 +109,9 @@ class TenantService:
                     monto_pago=monto_pago
                 )
                 db.add(nuevo_historial)
-                db.commit()
+                db.flush()
                 
-                # Notificar a superadmins (reutilizando función de p1)
+                # Notificar a superadmins
                 try:
                     from app.modules.p1_usuarios.services import notify_superadmins_bg
                     if background_tasks:
@@ -99,9 +119,9 @@ class TenantService:
                 except ImportError:
                     pass
             
-            # CU-29: Si se envió un correo, crear el usuario administrador automáticamente
+            # CU-29: Creación de Usuario Atómica
             if email_admin:
-                # Generar contraseña segura: 8 caracteres (letras, dígitos y un carácter especial)
+                # Generar contraseña segura: 8 caracteres
                 alphabet = string.ascii_letters + string.digits
                 temp_password = ''.join(secrets.choice(alphabet) for i in range(8)) + "!"
                 
@@ -114,8 +134,7 @@ class TenantService:
                     tenant_id=db_tenant.id
                 )
                 db.add(new_admin)
-                db.commit()
-                db.refresh(new_admin)
+                db.flush()
                 
                 # Asignar membresía
                 membership = TenantMembership(
@@ -124,27 +143,41 @@ class TenantService:
                     rol_en_tenant="admin"
                 )
                 db.add(membership)
-                db.commit()
+                db.flush()
                 
-                # Para la defensa y pruebas: Imprimir la contraseña en los logs
                 print(f"==================================================")
                 print(f"TENANT CREADO: {db_tenant.nombre}")
                 print(f"USUARIO: {email_admin}")
                 print(f"CONTRASEÑA TEMPORAL: {temp_password}")
                 print(f"==================================================")
                 
-                # Enviar correo de credenciales en segundo plano para no bloquear
-                if background_tasks:
-                    background_tasks.add_task(send_tenant_welcome_email, email_admin, db_tenant.nombre, temp_password)
-                else:
-                    send_tenant_welcome_email(email_admin, db_tenant.nombre, temp_password)
+                # Forzar BackgroundTasks para correos
+                if not background_tasks:
+                    # En FastAPI podemos instanciarlo si no lo pasan
+                    background_tasks = BackgroundTasks()
                 
+                background_tasks.add_task(send_tenant_welcome_email, email_admin, db_tenant.nombre, temp_password)
+                
+            # Todo ha salido bien. Guardamos en disco.
+            db.commit()
+            db.refresh(db_tenant)
+            
             return db_tenant
-        except IntegrityError:
+            
+        except HTTPException:
+            db.rollback()
+            raise
+        except IntegrityError as e:
             db.rollback()
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="El slug del tenant ya existe",
+                status_code=status.HTTP_409_CONFLICT,
+                detail="El dominio o el correo electrónico ya existen en la plataforma."
+            )
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Ocurrió un error inesperado: {str(e)}"
             )
 
     @staticmethod

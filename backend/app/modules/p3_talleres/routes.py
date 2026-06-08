@@ -29,15 +29,30 @@ from app.modules.p3_talleres.schemas import (
     WorkshopCreate,
     WorkshopOut,
     WorkshopProfileOut,
+    TallerCercanoOut,
 )
 from app.modules.p3_talleres.services import WorkshopService
 
 router = APIRouter(prefix="/workshops", tags=["P3 · Talleres"])
 
-
 # ═══════════════════════════════════════════════════════════════════════
 # CU10 — Registrar taller y técnicos
 # ═══════════════════════════════════════════════════════════════════════
+
+@router.get(
+    "/cercanos",
+    response_model=list[TallerCercanoOut],
+    summary="CU31 · Buscar talleres cercanos (Geoespacial)",
+)
+def buscar_talleres_cercanos(
+    lat: float,
+    lng: float,
+    radio_km: float = 50.0,
+    db: Session = Depends(get_db),
+    _current: Usuario = Depends(get_current_user),
+):
+    """Busca talleres cercanos usando la fórmula de Haversine."""
+    return WorkshopService.buscar_talleres_cercanos(db, lat, lng, radio_km)
 
 @router.post(
     "",

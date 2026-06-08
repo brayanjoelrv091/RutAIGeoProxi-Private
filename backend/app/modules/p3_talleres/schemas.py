@@ -24,6 +24,7 @@ class WorkshopCreate(BaseModel):
 class WorkshopOut(BaseModel):
     id: int
     usuario_propietario_id: int
+    tenant_id: int | None
     nombre: str
     direccion: str
     latitud: float
@@ -40,6 +41,9 @@ class WorkshopOut(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+class TallerCercanoOut(WorkshopOut):
+    distancia_km: float
 
 # ═══════════════════════════════════════════════════════════════════════
 # TÉCNICO  (CU10)

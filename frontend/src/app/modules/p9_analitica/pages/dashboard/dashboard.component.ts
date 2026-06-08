@@ -49,14 +49,27 @@ export class DashboardComponent implements OnInit {
         this.kpis = data;
         
         // Categoria (Pie)
-        this.pieChartData.labels = Object.keys(data.incidentes_por_categoria);
-        this.pieChartData.datasets[0].data = Object.values(data.incidentes_por_categoria);
+        const categorias = data.incidentes_por_categoria || {};
+        const catKeys = Object.keys(categorias);
+        if (catKeys.length > 0) {
+          this.pieChartData.labels = catKeys;
+          this.pieChartData.datasets[0].data = Object.values(categorias);
+        } else {
+          this.pieChartData.labels = ['Sin datos'];
+          this.pieChartData.datasets[0].data = [1];
+        }
 
         // Talleres Eficientes (Bar)
-        this.barChartData.labels = data.talleres_mas_eficientes.map(t => t.nombre);
-        this.barChartData.datasets = [
-          { data: data.talleres_mas_eficientes.map(t => t.avg_resolucion_min), label: 'Minutos Promedio', backgroundColor: '#3b82f6' }
-        ];
+        const talleres = data.talleres_mas_eficientes || [];
+        if (talleres.length > 0) {
+          this.barChartData.labels = talleres.map(t => t.nombre);
+          this.barChartData.datasets = [
+            { data: talleres.map(t => t.avg_resolucion_min), label: 'Minutos Promedio', backgroundColor: '#3b82f6' }
+          ];
+        } else {
+          this.barChartData.labels = ['Sin Talleres'];
+          this.barChartData.datasets = [{ data: [0], label: 'Minutos Promedio' }];
+        }
 
         this.loading = false;
       },

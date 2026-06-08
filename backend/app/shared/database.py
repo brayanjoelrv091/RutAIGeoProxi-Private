@@ -41,3 +41,50 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# ── Interceptor ORM para Multi-Tenant (CU-28) ──
+from sqlalchemy import event
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import Select
+
+@event.listens_for(Session, "do_orm_execute")
+def _add_tenant_filter(execute_state):
+    """
+    Intercepta cada consulta enviada por SQLAlchemy. Si el modelo destino
+    tiene la columna 'tenant_id' y el usuario no es un SuperAdmin Global,
+    inyecta automáticamente un filtro `.filter(tenant_id == X)`.
+    """
+    if execute_state.is_select and not execute_state.is_column_load and not execute_state.is_relationship_load:
+        from app.shared.context import current_tenant_id, is_superadmin
+        
+        # Omitir si es un superadmin operando globalmente
+        if is_superadmin.get():
+            return
+
+        tenant_id = current_tenant_id.get()
+        if tenant_id is None:
+            # Si un request llega sin tenant_id y sin ser superadmin, no asume nada
+            # (El filtro podría fallar si se requiere org, pero deps.py bloquea tokens sin tenant_id)
+            pass
+
+        # Analizamos las entidades de la consulta (Froms)
+        for mapper in execute_state.bind_arguments.get("mapper", []):
+            pass
+            
+        # Manera moderna en SQLAlchemy 2.0 de interceptar e inyectar un criterio:
+        # iterate over all entities in the query
+        for plugin_subject in execute_state.info.get("_tenant_filtered", []):
+            return # ya procesado
+            
+        execute_state.info["_tenant_filtered"] = True
+        
+        # Aplicamos el filtro a todas las entidades del query que tengan tenant_id
+        # execute_state.statement es el Select object
+        statement = execute_state.statement
+        if isinstance(statement, Select):
+            for column in statement.get_final_froms():
+                if "tenant_id" in column.columns:
+                    # Inyectar el filtro
+                    # SQLAlchemy 2.0 syntax para añadir where criteria
+                    execute_state.statement = statement.where(column.columns.tenant_id == tenant_id)

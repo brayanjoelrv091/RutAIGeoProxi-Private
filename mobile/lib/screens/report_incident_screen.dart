@@ -309,6 +309,10 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       longitud: _currentPosition!.longitude,
       direccion: "Guardado Offline (Sin conexión)",
       createdAtLocal: DateTime.now().toUtc().toIso8601String(),
+      tipoBusqueda: _tipoBusqueda,
+      tallerPreferidoId: _tallerPreferidoId,
+      imagePaths: _imageFiles.isEmpty ? null : _imageFiles.map((e) => e.path).toList(),
+      audioPath: _audioFile?.path,
     );
 
     await OfflineQueue.enqueue(offlineItem);
@@ -320,14 +324,28 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('📡 Sin conexión. Guardado en cola offline. Se enviará automáticamente.'),
-          backgroundColor: Color(0xFFF59E0B),
-          duration: Duration(seconds: 4),
+      setState(() => _loading = false);
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          backgroundColor: const Color(0xFF111629),
+          title: const Text('Reporte Guardado', style: TextStyle(color: Colors.white)),
+          content: const Text(
+            'Incidente guardado localmente de forma segura. Se enviará automáticamente al recuperar conexión.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK', style: TextStyle(color: Color(0xFF00F2FF))),
+            ),
+          ],
         ),
       );
-      Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
     }
   }
 
@@ -585,14 +603,14 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
               ElevatedButton(
                 onPressed: _loading || _isRecording ? null : _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF6B6B),
+                  backgroundColor: _isOnline ? const Color(0xFFFF6B6B) : const Color(0xFF6B7280),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _loading 
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('ENVIAR PARA ANÁLISIS IA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
+                  : Text(_isOnline ? 'ENVIAR PARA ANÁLISIS IA' : 'GUARDAR REPORTE (OFFLINE)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
               ),
             ],
           ),

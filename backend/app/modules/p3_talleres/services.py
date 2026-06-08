@@ -160,6 +160,36 @@ class WorkshopService:
             t.en_linea = WorkshopService._is_online(t)
         return talleres
 
+    @staticmethod
+    def buscar_talleres_cercanos(db: Session, lat: float, lng: float, radius_km: float = 50.0) -> list[Taller]:
+        """CU-31: Búsqueda geoespacial usando la fórmula de Haversine nativa en DB."""
+        from sqlalchemy import func
+        
+        # 6371 es el radio de la Tierra en kilómetros
+        # Haversine formula
+        distance_expr = 6371 * func.acos(
+            func.cos(func.radians(lat)) * func.cos(func.radians(Taller.latitud)) *
+            func.cos(func.radians(Taller.longitud) - func.radians(lng)) +
+            func.sin(func.radians(lat)) * func.sin(func.radians(Taller.latitud))
+        )
+        
+        # Seleccionar talleres activos y filtrarlos por radio
+        query = (
+            db.query(Taller, distance_expr.label("distancia"))
+            .filter(Taller.esta_activo == True, Taller.estado_registro == "completado")
+            .filter(distance_expr <= radius_km)
+            .order_by(distance_expr)
+            .limit(20)
+        )
+        
+        resultados = []
+        for taller, distancia in query.all():
+            taller.distancia_km = round(distancia, 2)
+            taller.en_linea = WorkshopService._is_online(taller)
+            resultados.append(taller)
+            
+        return resultados
+
     # ── HEARTBEAT Y PERFIL ──────────────────────────────────────────
 
     @staticmethod

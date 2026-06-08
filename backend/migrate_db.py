@@ -1,38 +1,22 @@
-from sqlalchemy import create_engine, text
-from app.shared.database import Base
-from app.modules.p1_usuarios.models import Usuario, Vehiculo
-from app.modules.p2_incidentes.models import Incidente, ClasificacionIncidente
-from app.modules.p3_talleres.models import Taller, Tecnico, SolicitudServicio
-from app.modules.p4_asignacion.models import Asignacion
-from app.modules.p5_pagos.models import Pago, Notificacion
-from app.shared.config import settings
+import sqlite3
 
-engine = create_engine(settings.DATABASE_URL)
+def upgrade():
+    try:
+        conn = sqlite3.connect('rutaigeoproxi.db')
+        cursor = conn.cursor()
+        
+        # Agregamos la columna para CU-32
+        cursor.execute("ALTER TABLE incidentes ADD COLUMN tiempo_estimado_reparacion_minutos INTEGER;")
+        
+        conn.commit()
+        print("✅ Migración exitosa: columna 'tiempo_estimado_reparacion_minutos' agregada a SQLite.")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" in str(e).lower():
+            print("⚠️ La columna ya existe, no es necesario hacer nada.")
+        else:
+            print(f"❌ Error al migrar: {e}")
+    finally:
+        conn.close()
 
-with engine.connect() as conn:
-    print("Migrando DB...")
-    try:
-        conn.execute(text('ALTER TABLE incidentes ADD COLUMN tipo_busqueda VARCHAR(30) DEFAULT \'general\' NOT NULL;'))
-        print("Añadido tipo_busqueda a incidentes")
-    except Exception as e:
-        print(e)
-    try:
-        conn.execute(text('ALTER TABLE incidentes ADD COLUMN taller_preferido_id INTEGER REFERENCES talleres(id) ON DELETE SET NULL;'))
-        print("Añadido taller_preferido_id a incidentes")
-    except Exception as e:
-        print(e)
-    try:
-        conn.execute(text('ALTER TABLE talleres ADD COLUMN estado_registro VARCHAR(30) DEFAULT \'pendiente_tecnicos\' NOT NULL;'))
-        print("Añadido estado_registro a talleres")
-    except Exception as e:
-        print(e)
-    try:
-        conn.execute(text('ALTER TABLE talleres ADD COLUMN ultimo_heartbeat TIMESTAMP WITH TIME ZONE;'))
-        print("Añadido ultimo_heartbeat a talleres")
-    except Exception as e:
-        print(e)
-    conn.commit()
-
-print("Creando nuevas tablas (usuarios_talleres_favoritos)...")
-Base.metadata.create_all(bind=engine)
-print("¡Migración completada!")
+if __name__ == '__main__':
+    upgrade()

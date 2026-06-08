@@ -14,11 +14,13 @@ from sqlalchemy.orm import Session
 
 from app.shared.deps import get_current_user, get_db, require_roles, require_operational_roles
 from app.modules.p1_usuarios.models import Usuario
+from pydantic import BaseModel
 from app.modules.p2_incidentes.schemas import (
     ClassificationOut,
     IncidentCreate,
     IncidentDetailOut,
     IncidentOut,
+    EstadoUpdate,
 )
 from app.modules.p2_incidentes.services import IncidentService
 
@@ -38,6 +40,10 @@ async def create_incident(
     longitud: float = Form(...),
     descripcion: str | None = Form(default=None),
     direccion: str | None = Form(default=None),
+    tipo_busqueda: str = Form(default="general"),
+    taller_preferido_id: int | None = Form(default=None),
+    sync_hash: str | None = Form(default=None),
+    local_timestamp: str | None = Form(default=None),
     fotos: list[UploadFile] = File(default=[]),
     audio: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
@@ -49,11 +55,15 @@ async def create_incident(
         latitud=latitud,
         longitud=longitud,
         direccion=direccion,
+        tipo_busqueda=tipo_busqueda,
+        taller_preferido_id=taller_preferido_id,
     )
     incidente = await IncidentService.create(
         db=db,
         user_id=current.id,
         payload=payload,
+        sync_hash=sync_hash,
+        local_timestamp=local_timestamp,
         fotos=fotos if fotos else None,
         audio=audio,
         background_tasks=background_tasks
@@ -123,3 +133,35 @@ async def reclassify_incident(
     _current: Usuario = Depends(require_operational_roles("admin")),
 ):
     return await IncidentService.reclassify(db, incident_id)
+
+class AsignarTallerPayload(BaseModel):
+    taller_id: int
+
+@router.post(
+    "/{incident_id}/asignar",
+    response_model=IncidentDetailOut,
+    summary="CU31 · Asignar taller a incidente",
+)
+def asignar_taller(
+    incident_id: int,
+    payload: AsignarTallerPayload,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(get_current_user),
+):
+    return IncidentService.asignar_taller(db, incident_id, payload.taller_id, background_tasks)
+
+@router.patch(
+    "/{incident_id}/estado",
+    summary="CU-25 · Actualizar estado del incidente en tiempo real",
+)
+async def update_incident_state(
+    incident_id: int,
+    payload: EstadoUpdate,
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(get_current_user),
+):
+    # Solamente permitimos si el usuario es dueño del tenant o admin
+    # Si es admin, current.tenant_id será None y se comportará global
+    return await IncidentService.update_estado(db, incident_id, payload.estado, current.tenant_id)
+

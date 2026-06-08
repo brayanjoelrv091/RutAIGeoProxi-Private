@@ -17,6 +17,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -38,6 +39,7 @@ import 'modules/vehicles/screens/my_vehicles_screen.dart';
 import 'modules/workshops/screens/workshop_list_screen.dart';
 import 'modules/auth/screens/profile_screen.dart';
 import 'screens/report_incident_screen.dart';
+import 'modules/offline/sync_manager.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -53,12 +55,45 @@ void main() async {
   runApp(const RutAIGeoProxiApp());
 }
 
-class RutAIGeoProxiApp extends StatelessWidget {
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
+class RutAIGeoProxiApp extends StatefulWidget {
   const RutAIGeoProxiApp({super.key});
+
+  @override
+  State<RutAIGeoProxiApp> createState() => _RutAIGeoProxiAppState();
+}
+
+class _RutAIGeoProxiAppState extends State<RutAIGeoProxiApp> {
+  StreamSubscription? _syncSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncSub = SyncManager().notifications.listen((message) {
+      rootScaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text(message, style: const TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: message.contains('éxito') ? const Color(0xFF00E676) : const Color(0xFFFF6B6B),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(top: 50, left: 20, right: 20),
+          duration: const Duration(seconds: 4),
+          dismissDirection: DismissDirection.up,
+        ),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _syncSub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       title: 'RutAIGeoProxi',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),

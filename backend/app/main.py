@@ -57,6 +57,7 @@ from app.modules.p9_analitica.models import KPISnapshot, Cotizacion, CotizacionI
 # ── Importar routers de módulos ──
 from app.modules.p1_usuarios.routes import admin_router, auth_router, profile_router
 from app.modules.p2_incidentes.routes import router as incidents_router
+from app.modules.p2_incidentes.ws_routes import ws_router
 from app.modules.p3_talleres.routes import router as workshops_router
 from app.modules.p4_asignacion.routes import router as assignments_router
 from app.modules.p5_pagos.routes import router as payments_router
@@ -188,6 +189,7 @@ app.include_router(admin_router)
 app.include_router(profile_router)
 # P2: Incidentes
 app.include_router(incidents_router)
+app.include_router(ws_router)
 # P3: Talleres
 app.include_router(workshops_router)
 # P4: Asignación

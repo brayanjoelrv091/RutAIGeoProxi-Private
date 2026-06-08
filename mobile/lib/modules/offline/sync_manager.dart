@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'offline_queue.dart';
 import 'connectivity_monitor.dart';
 import '../../config.dart';
+import '../../backend.dart';
 
 /// P8 · CU-22 — Sincronización automática de incidentes offline.
 ///
@@ -76,13 +78,18 @@ class SyncItemResult {
 
 
 class SyncManager {
+  static final SyncManager _instance = SyncManager._internal();
+  factory SyncManager() => _instance;
+
   final ConnectivityMonitor _connectivity;
   StreamSubscription? _connectivitySub;
   bool _isSyncing = false;
   SyncCallback? onSyncComplete;
 
-  SyncManager({ConnectivityMonitor? connectivity})
-    : _connectivity = connectivity ?? ConnectivityMonitor();
+  final _notificationsController = StreamController<String>.broadcast();
+  Stream<String> get notifications => _notificationsController.stream;
+
+  SyncManager._internal() : _connectivity = ConnectivityMonitor();
 
   /// Inicia el listener de conectividad para auto-sync.
   void startAutoSync(String token) {
@@ -110,44 +117,105 @@ class SyncManager {
     _isSyncing = true;
 
     try {
-      final payload = {
-        'items': pending.map((item) {
-          final json = item.toJson();
-          json.remove('synced'); // No enviar flag interno
-          return json;
-        }).toList(),
-      };
+      final results = <SyncItemResult>[];
+      int created = 0;
+      int errors = 0;
+      bool abort = false;
 
-      final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/realtime/incidents/offline-sync'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(payload),
-      ).timeout(const Duration(seconds: 30));
+      for (final item in pending) {
+        if (!_connectivity.isOnline) {
+          print('[SyncManager] Red desconectada, abortando sincronización.');
+          abort = true;
+          break;
+        }
 
-      if (response.statusCode == 200) {
-        final result = SyncResult.fromJson(jsonDecode(response.body));
+        bool success = false;
+        String? lastError;
 
-        // Marcar items sincronizados
-        for (final item in result.items) {
-          if (item.status == 'created' || item.status == 'duplicate') {
-            await OfflineQueue.markSynced(item.idempotencyKey);
+        for (int attempt = 1; attempt <= 3; attempt++) {
+          if (!_connectivity.isOnline) {
+            abort = true;
+            break;
+          }
+
+          try {
+            final error = await Backend.reportIncident(
+              title: item.titulo,
+              description: item.descripcion,
+              lat: item.latitud,
+              lng: item.longitud,
+              address: item.direccion,
+              tipoBusqueda: item.tipoBusqueda,
+              tallerPreferidoId: item.tallerPreferidoId,
+              syncHash: item.idempotencyKey,
+              localTimestamp: item.createdAtLocal,
+              images: item.imagePaths?.map((p) => File(p)).toList(),
+              audio: item.audioPath != null ? File(item.audioPath!) : null,
+            );
+
+            if (error == null) {
+              await OfflineQueue.markSynced(item.idempotencyKey);
+              created++;
+              success = true;
+              results.add(SyncItemResult(
+                idempotencyKey: item.idempotencyKey,
+                status: 'created',
+                message: 'Sincronizado correctamente',
+              ));
+              break; // Éxito, salir de los reintentos
+            } else {
+              lastError = error;
+              print('[SyncManager] Error subiendo ${item.idempotencyKey} (Intento $attempt): $error');
+              if (error.contains('Hash corrupto')) {
+                await OfflineQueue.markError(item.idempotencyKey);
+                _notificationsController.add('Conflicto: Incidente corrupto o duplicado. Reporte marcado con error.');
+                break; // No reintentar si el hash/timestamp es inválido
+              }
+            }
+          } catch (e) {
+            lastError = e.toString();
+            print('[SyncManager] Excepción subiendo ${item.idempotencyKey} (Intento $attempt): $e');
+          }
+
+          if (attempt < 3 && !abort) {
+            await Future.delayed(Duration(seconds: 2 * attempt)); // Exponential backoff: 2s, 4s
           }
         }
 
-        // Limpiar items ya sincronizados
-        await OfflineQueue.clearSynced();
+        if (abort) break;
 
-        onSyncComplete?.call(result);
-        return result;
-      } else {
-        print('[SyncManager] Error HTTP ${response.statusCode}: ${response.body}');
-        return SyncResult.empty();
+        if (!success) {
+          errors++;
+          results.add(SyncItemResult(
+            idempotencyKey: item.idempotencyKey,
+            status: 'error',
+            message: lastError ?? 'Error desconocido',
+          ));
+        }
       }
+
+      await OfflineQueue.clearSynced();
+
+      final result = SyncResult(
+        total: pending.length,
+        created: created,
+        duplicates: 0,
+        errors: errors,
+        items: results,
+      );
+
+      if (abort) {
+        _notificationsController.add('Sincronización pausada por caída de red.');
+      } else if (errors == 0 && created > 0) {
+        _notificationsController.add('Tus incidentes pendientes han sido sincronizados con éxito');
+      } else if (errors > 0 && created == 0) {
+        _notificationsController.add('No se pudo sincronizar tu reporte pendiente. Se intentará más tarde');
+      }
+
+      onSyncComplete?.call(result);
+      return result;
     } catch (e) {
-      print('[SyncManager] Error de sincronización: $e');
+      print('[SyncManager] Error crítico de sincronización: $e');
       return SyncResult.empty();
     } finally {
       _isSyncing = false;

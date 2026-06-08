@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     String,
     Float,
+    Numeric,
     DateTime,
     ForeignKey,
     Text,
@@ -22,20 +23,27 @@ def _utc_now():
 
 class Pago(Base):
     """
-    CU18 · Registro de transacciones (Simulado).
+    CU33 · Registro de transacciones con Stripe.
     """
 
     __tablename__ = "pagos"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(
+        Integer,
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     incidente_id = Column(Integer, ForeignKey("incidentes.id"), nullable=False)
-    monto = Column(Float, nullable=False)
-    comision_plataforma = Column(Float, default=0.0)  # 10% para la empresa
+    monto = Column(Numeric(10, 2), nullable=False)
+    comision_plataforma = Column(Numeric(10, 2), default=0.00)  # 10% para la empresa
     moneda = Column(String(10), default="USD")
     estado = Column(String(30), default="pendiente")  # pendiente | completado | fallido
     metodo_pago = Column(String(50))  # tarjeta | transferencia | efectivo
     proveedor = Column(String(50), default="stripe")
-    transaccion_id = Column(String(100), unique=True)  # ID externo simulado o real
+    stripe_checkout_session_id = Column(String(150), unique=True, index=True, nullable=True)
+    transaccion_id = Column(String(100), unique=True, nullable=True)  # ID externo real (PaymentIntent)
     gateway_response = Column(Text, nullable=True) # JSON raw de la respuesta del proveedor
     creado_at = Column(DateTime, default=_utc_now)
 

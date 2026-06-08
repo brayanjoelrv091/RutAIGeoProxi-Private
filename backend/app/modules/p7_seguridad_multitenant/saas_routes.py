@@ -196,22 +196,41 @@ async def process_saas_voice_command(
     audio: UploadFile = File(...),
     _current: Usuario = Depends(require_superadmin)
 ):
-    from app.modules.p2_incidentes.classifier import get_classifier
+    import httpx
     
     # Guardar audio temporalmente
     temp_dir = Path("temp_audio")
     temp_dir.mkdir(exist_ok=True)
-    temp_file = temp_dir / f"{uuid.uuid4()}_{audio.filename}"
+    temp_file = temp_dir / f"{uuid.uuid4()}_voice.webm"
     
     with open(temp_file, "wb") as f:
         shutil.copyfileobj(audio.file, f)
         
     try:
-        classifier = get_classifier()
-        # Transcribir audio usando Whisper
-        text = await classifier.transcribe_audio_groq(str(temp_file))
+        if not settings.GROQ_API_KEY:
+            raise HTTPException(status_code=500, detail="GROQ API key no configurada")
+            
+        # Transcribir directo usando httpx con mime-type correcto
+        url = "https://api.groq.com/openai/v1/audio/transcriptions"
+        headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}"}
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            with open(temp_file, "rb") as f:
+                files = {
+                    "file": ("voice.webm", f, "audio/webm"),
+                    "model": (None, "whisper-large-v3-turbo"),
+                    "language": (None, "es"),
+                    "response_format": (None, "json"),
+                }
+                resp = await client.post(url, headers=headers, files=files)
+                if resp.status_code != 200:
+                    logger.error(f"Groq Whisper Error: {resp.text}")
+                    raise HTTPException(status_code=400, detail="Error transcribiendo audio con Groq")
+                
+                text = resp.json().get("text", "").strip()
+        
         if not text:
-            raise HTTPException(status_code=400, detail="No se pudo transcribir el audio")
+            raise HTTPException(status_code=400, detail="El audio no contiene voz o fue inaudible")
             
         # Extraer filtros usando Groq LLM
         filters = await extract_saas_filters_groq(text)

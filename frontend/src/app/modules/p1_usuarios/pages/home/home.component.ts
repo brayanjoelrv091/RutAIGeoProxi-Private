@@ -82,6 +82,10 @@ export class HomeComponent implements OnInit {
     return this.me?.rol === 'admin';
   }
 
+  get isSuperadmin(): boolean {
+    return this.me?.rol === 'admin' && this.me?.tenant_id === null;
+  }
+
   get isTaller(): boolean {
     return this.me?.rol === 'taller';
   }

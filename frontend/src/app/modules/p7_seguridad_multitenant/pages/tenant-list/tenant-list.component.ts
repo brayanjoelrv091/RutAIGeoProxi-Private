@@ -12,6 +12,7 @@ export interface Tenant {
   estado: string;
   plan: string;
   estado_pago: string;
+  metodo_pago?: string;
   creado_en: string;
 }
 

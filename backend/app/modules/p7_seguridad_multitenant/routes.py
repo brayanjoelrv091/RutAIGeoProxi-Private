@@ -108,7 +108,7 @@ def superadmin_upgrade_tenant(
     schema: TenantSuperadminUpgradeRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(admin_dep),
+    current_user: Usuario = Depends(require_roles("admin")),
 ):
     """El Superadmin fuerza el upgrade de un tenant y registra el pago manual."""
     # Validación extra: Solo un superadmin puede hacer esto
@@ -131,7 +131,7 @@ def superadmin_upgrade_tenant_confirm(
     schema: TenantSuperadminUpgradeRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(admin_dep),
+    current_user: Usuario = Depends(require_roles("admin")),
 ):
     if current_user.tenant_id is not None:
         raise HTTPException(status_code=403, detail="Solo el Superadministrador global puede realizar upgrades manuales.")
@@ -150,7 +150,7 @@ def add_member(
     tenant_id: int,
     schema: MembershipCreate,
     db: Session = Depends(get_db),
-    _current: Usuario = Depends(admin_dep),
+    _current: Usuario = Depends(require_roles("admin")),
 ):
     return TenantService.add_member(db, tenant_id, schema)
 
@@ -160,7 +160,7 @@ def remove_member(
     tenant_id: int,
     usuario_id: int,
     db: Session = Depends(get_db),
-    _current: Usuario = Depends(admin_dep),
+    _current: Usuario = Depends(require_roles("admin")),
 ):
     TenantService.remove_member(db, tenant_id, usuario_id)
 
@@ -169,6 +169,6 @@ def remove_member(
 def list_members(
     tenant_id: int,
     db: Session = Depends(get_db),
-    _current: Usuario = Depends(admin_dep),
+    _current: Usuario = Depends(require_roles("admin")),
 ):
     return TenantService.list_members(db, tenant_id)

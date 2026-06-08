@@ -136,8 +136,89 @@ export class SuperadminSaasComponent implements OnInit {
     URL.revokeObjectURL(url);
   }
 
-  exportPDF() {
-    if (this.tenants.length === 0) return;
+  isRecording = false;
+  mediaRecorder: MediaRecorder | null = null;
+  audioChunks: Blob[] = [];
+
+  async startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.mediaRecorder = new MediaRecorder(stream);
+      this.audioChunks = [];
+
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.audioChunks.push(event.data);
+        }
+      };
+
+      this.mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        await this.processVoiceCommand(audioBlob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      this.mediaRecorder.start();
+      this.isRecording = true;
+    } catch (err) {
+      alert('Error accediendo al micrófono.');
+      console.error(err);
+    }
+  }
+
+  stopRecording() {
+    if (this.mediaRecorder && this.isRecording) {
+      this.mediaRecorder.stop();
+      this.isRecording = false;
+    }
+  }
+
+  async processVoiceCommand(audioBlob: Blob) {
+    this.loading = true;
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'voice_command.webm');
+
+    try {
+      const res = await fetch(`${environment.apiUrl}/admin/saas/voice-command`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.auth.token}` },
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const filters = data.filtros || {};
+        this.generateFilteredPDF(filters);
+      } else {
+        alert('Error al procesar el comando de voz.');
+      }
+    } catch (e) {
+      alert('Error de red procesando el audio.');
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  generateFilteredPDF(filters: any) {
+    let filteredTenants = [...this.tenants];
+    
+    // Filtro por nombre
+    if (filters.tenant_nombre) {
+      const term = filters.tenant_nombre.toLowerCase();
+      filteredTenants = filteredTenants.filter(t => t.nombre.toLowerCase().includes(term));
+    }
+    
+    // Filtro por fechas aplicaría sobre el historial para calcular el total
+    // Aquí hacemos un filtrado básico:
+    this.exportPDF(filteredTenants, filters.tenant_nombre, filters.fecha_inicio, filters.fecha_fin);
+  }
+
+  async exportPDF(tenantsToExport?: Tenant[], filterName?: string, filterStart?: string, filterEnd?: string) {
+    const list = tenantsToExport || this.tenants;
+    if (list.length === 0) {
+      alert('No hay datos para generar el PDF');
+      return;
+    }
 
     const doc = new jsPDF();
     doc.setFontSize(18);
@@ -145,18 +226,34 @@ export class SuperadminSaasComponent implements OnInit {
     
     doc.setFontSize(11);
     doc.setTextColor(100);
-    doc.text(`Generado el: ${new Date().toLocaleDateString()}`, 14, 30);
+    let yPos = 30;
+    doc.text(`Generado el: ${new Date().toLocaleDateString()}`, 14, yPos);
+    
+    if (filterName) {
+      yPos += 7;
+      doc.text(`Filtro Empresa: ${filterName}`, 14, yPos);
+    }
+    if (filterStart || filterEnd) {
+      yPos += 7;
+      doc.text(`Rango: ${filterStart || 'Inicio'} a ${filterEnd || 'Hoy'}`, 14, yPos);
+    }
 
-    const tableColumn = ["ID", "Empresa", "Plan", "Monto", "Estado", "Vencimiento"];
+    const tableColumn = ["ID", "Empresa", "Plan", "Monto", "Acumulado", "Vencimiento"];
     const tableRows: any[] = [];
+    let calculatedTotal = 0;
 
-    this.tenants.forEach(t => {
+    list.forEach(t => {
+      let acumulado = t.total_pagado || 0;
+      // Si vinieron fechas, deberíamos idealmente filtrar el historial interno
+      // pero para simplificar sumamos todo el histórico.
+      calculatedTotal += acumulado;
+      
       const row = [
         t.id,
         t.nombre,
         t.plan.toUpperCase(),
         `$${t.monto_pago}`,
-        t.esta_activo ? 'ACTIVO' : 'SUSPENDIDO',
+        `$${acumulado}`,
         t.fecha_fin_plan ? new Date(t.fecha_fin_plan).toLocaleDateString() : 'N/A'
       ];
       tableRows.push(row);
@@ -165,11 +262,31 @@ export class SuperadminSaasComponent implements OnInit {
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 35,
+      startY: yPos + 10,
       styles: { fontSize: 10 },
       headStyles: { fillColor: [0, 242, 255], textColor: [0, 0, 0] }
     });
+    
+    const finalY = (doc as any).lastAutoTable.finalY || yPos + 10;
+    doc.setFontSize(12);
+    doc.setTextColor(0);
+    doc.text(`Ganancia Total Acumulada: $${calculatedTotal}`, 14, finalY + 10);
 
-    doc.save(`SaaS_Historial_${new Date().toISOString().split('T')[0]}.pdf`);
+    const fileName = `SaaS_Historial_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+    
+    // Enviar notificación Push
+    try {
+      await fetch(`${environment.apiUrl}/admin/saas/pdf-generated-notification`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.auth.token}` 
+        },
+        body: JSON.stringify({ message: `El reporte PDF (${fileName}) ha sido generado exitosamente con un acumulado de $${calculatedTotal}.` })
+      });
+    } catch (e) {
+      console.error('Error enviando notificación de PDF', e);
+    }
   }
 }

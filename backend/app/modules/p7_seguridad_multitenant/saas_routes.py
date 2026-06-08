@@ -7,6 +7,55 @@ from datetime import datetime
 from app.shared.deps import get_db, require_roles
 from app.modules.p1_usuarios.models import Usuario
 from app.modules.p7_seguridad_multitenant.models import Tenant
+from app.shared.config import settings
+import httpx
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def extract_saas_filters_groq(text: str) -> dict:
+    """Extrae la intención (tenant y fechas) del texto usando Groq Llama 3."""
+    if not settings.GROQ_API_KEY:
+        return {}
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    
+    system_prompt = (
+        "Eres un asistente de la plataforma RutAIGeoProxi para el SuperAdmin. "
+        "Tu tarea es extraer filtros para generar un reporte PDF de historial de pagos SaaS a partir de la instrucción del usuario.\n"
+        "Devuelve ÚNICAMENTE un JSON válido con estas claves:\n"
+        "- 'tenant_nombre': nombre de la empresa o taller mencionado (str, o null si no menciona).\n"
+        "- 'fecha_inicio': fecha de inicio aproximada en formato YYYY-MM-DD (str, o null si no menciona).\n"
+        "- 'fecha_fin': fecha de fin aproximada en formato YYYY-MM-DD (str, o null si no menciona).\n"
+        "Considera que hoy es " + datetime.now().strftime("%Y-%m-%d") + "."
+    )
+    
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text},
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1,
+        "max_tokens": 150,
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(url, headers=headers, json=payload)
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"]
+            data = json.loads(content)
+            return data
+    except Exception as e:
+        logger.error(f"Error extrayendo filtros SaaS con Groq: {e}")
+        return {}
 
 router = APIRouter(tags=["P7 · Gestión SaaS (SuperAdmin)"])
 
@@ -135,3 +184,82 @@ def update_tenant_status(
         background_tasks.add_task(notify_tenant_users_bg, tenant_id, is_suspended, tenant.nombre)
         
     return tenant
+
+from fastapi import UploadFile, File
+import shutil
+from pathlib import Path
+import os
+import uuid
+
+@router.post("/voice-command", summary="Procesar comando de voz para filtros SaaS")
+async def process_saas_voice_command(
+    audio: UploadFile = File(...),
+    _current: Usuario = Depends(require_superadmin)
+):
+    from app.modules.p2_incidentes.classifier import get_classifier
+    
+    # Guardar audio temporalmente
+    temp_dir = Path("temp_audio")
+    temp_dir.mkdir(exist_ok=True)
+    temp_file = temp_dir / f"{uuid.uuid4()}_{audio.filename}"
+    
+    with open(temp_file, "wb") as f:
+        shutil.copyfileobj(audio.file, f)
+        
+    try:
+        classifier = get_classifier()
+        # Transcribir audio usando Whisper
+        text = await classifier.transcribe_audio_groq(str(temp_file))
+        if not text:
+            raise HTTPException(status_code=400, detail="No se pudo transcribir el audio")
+            
+        # Extraer filtros usando Groq LLM
+        filters = await extract_saas_filters_groq(text)
+        return {"texto_transcrito": text, "filtros": filters}
+    finally:
+        if temp_file.exists():
+            os.remove(temp_file)
+
+class PdfNotificationPayload(BaseModel):
+    message: str
+
+@router.post("/pdf-generated-notification", summary="Notifica generación de PDF")
+async def notify_pdf_generated(
+    payload: PdfNotificationPayload,
+    background_tasks: BackgroundTasks,
+    _current: Usuario = Depends(require_superadmin)
+):
+    from app.shared.database import SessionLocal
+    from app.modules.p5_pagos.models import Notificacion
+    from app.shared.websocket_manager import manager
+    from app.shared.firebase_config import send_push_notification
+    
+    db = SessionLocal()
+    try:
+        titulo = "Reporte Generado"
+        mensaje = payload.message
+        
+        db.add(Notificacion(
+            usuario_id=_current.id,
+            titulo=titulo,
+            mensaje=mensaje,
+            tipo="push"
+        ))
+        
+        # WebSocket Notification
+        ws_payload = {
+            "type": "report_generated",
+            "titulo": titulo,
+            "mensaje": mensaje,
+        }
+        await manager.send_personal_message(ws_payload, str(_current.id))
+        
+        # FCM Push Notification
+        if _current.fcm_token:
+            send_push_notification(_current.fcm_token, titulo, mensaje)
+            
+        db.commit()
+    finally:
+        db.close()
+    
+    return {"status": "ok"}

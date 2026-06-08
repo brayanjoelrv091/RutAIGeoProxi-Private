@@ -68,17 +68,7 @@ def _add_tenant_filter(execute_state):
             # (El filtro podría fallar si se requiere org, pero deps.py bloquea tokens sin tenant_id)
             pass
 
-        # Analizamos las entidades de la consulta (Froms)
-        for mapper in execute_state.bind_arguments.get("mapper", []):
-            pass
-            
         # Manera moderna en SQLAlchemy 2.0 de interceptar e inyectar un criterio:
-        # iterate over all entities in the query
-        for plugin_subject in execute_state.info.get("_tenant_filtered", []):
-            return # ya procesado
-            
-        execute_state.info["_tenant_filtered"] = True
-        
         # Aplicamos el filtro a todas las entidades del query que tengan tenant_id
         # execute_state.statement es el Select object
         statement = execute_state.statement

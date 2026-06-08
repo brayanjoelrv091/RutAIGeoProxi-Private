@@ -24,6 +24,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy import Table
 
 from app.shared.database import Base
+from app.modules.p4_asignacion.models import Asignacion
 
 
 usuarios_talleres_favoritos = Table(

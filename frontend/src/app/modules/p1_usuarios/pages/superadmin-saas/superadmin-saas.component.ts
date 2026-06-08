@@ -18,6 +18,7 @@ interface Tenant {
   monto_pago: number;
   admin_nombre: string;
   admin_email: string;
+  total_pagado: number;
   historial_suscripciones?: any[];
   expanded?: boolean;
 }
@@ -35,6 +36,7 @@ export class SuperadminSaasComponent implements OnInit {
   tenants: Tenant[] = [];
   loading = true;
   error = '';
+  totalRevenue = 0;
 
   ngOnInit(): void {
     this.fetchTenants();
@@ -56,6 +58,7 @@ export class SuperadminSaasComponent implements OnInit {
           }
           return t;
         });
+        this.totalRevenue = this.tenants.reduce((acc, t) => acc + (t.total_pagado || 0), 0);
       } else {
         this.error = 'No se pudieron cargar los tenants.';
       }

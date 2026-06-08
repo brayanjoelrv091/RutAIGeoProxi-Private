@@ -28,6 +28,7 @@ class TenantOut(BaseModel):
     monto_pago: int = 0
     admin_nombre: str | None = None
     admin_email: str | None = None
+    total_pagado: int = 0
     historial_suscripciones: List[TenantSubscriptionHistoryOut] = []
     
     class Config:
@@ -103,6 +104,11 @@ def list_all_tenants(
         else:
             setattr(t, "admin_nombre", "Desconocido")
             setattr(t, "admin_email", "Desconocido")
+            
+        # Calcular total histórico pagado por el tenant
+        total_pago = sum(h.monto_pago for h in t.historial_suscripciones if h.estado_pago == 'pagado')
+        setattr(t, "total_pagado", total_pago)
+        
     return tenants
 
 @router.patch("/tenants/{tenant_id}/status", response_model=TenantOut, summary="Activar o suspender un tenant (Solo SuperAdmin)")

@@ -2,13 +2,21 @@
   <div class="tech-header">
     <h2><span class="tech-icon">🌐</span> Gestión SaaS Global</h2>
     <p class="subtitle">Panel exclusivo para SuperAdmin: controla todas las suscripciones de los Tenants.</p>
-    <div style="margin-top: 15px; display: flex; gap: 10px;">
-      <button class="btn-premium" style="padding: 8px 15px; font-size: 0.9rem;" (click)="exportCSV()">
-        <i class="fas fa-file-excel"></i> Descargar CSV (Excel)
-      </button>
-      <button class="btn-outline-cyan" style="padding: 8px 15px; font-size: 0.9rem;" (click)="exportPDF()">
-        <i class="fas fa-file-pdf"></i> Exportar PDF
-      </button>
+    
+    <!-- DASHBOARD RESUMEN -->
+    <div style="margin-top: 15px; display: flex; gap: 20px; align-items: center;">
+      <div class="revenue-card" style="background: rgba(0, 242, 255, 0.1); border: 1px solid #00f2ff; padding: 10px 20px; border-radius: 8px;">
+        <span style="color: #ccc; font-size: 0.85rem; display: block; text-transform: uppercase;">Ingresos Totales Acumulados</span>
+        <strong style="color: #00f2ff; font-size: 1.5rem;">${{ totalRevenue }}</strong>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-premium" style="padding: 8px 15px; font-size: 0.9rem;" (click)="exportCSV()">
+          <i class="fas fa-file-excel"></i> Descargar CSV (Excel)
+        </button>
+        <button class="btn-outline-cyan" style="padding: 8px 15px; font-size: 0.9rem;" (click)="exportPDF()">
+          <i class="fas fa-file-pdf"></i> Exportar PDF
+        </button>
+      </div>
     </div>
   </div>
 
@@ -57,10 +65,10 @@
               </td>
               <td>
                 <div style="display: flex; flex-direction: column; gap: 5px;">
-                  <span style="font-size: 0.9rem; color: #fff;">${{ tenant.monto_pago }}</span>
-                  <span style="font-size: 0.75rem; color: #00f2ff;">{{ tenant.metodo_pago | uppercase }}</span>
+                  <span style="font-size: 0.9rem; color: #fff;">Cuota: ${{ tenant.monto_pago }}</span>
+                  <span style="font-size: 0.75rem; color: #00f2ff;">Histórico: ${{ tenant.total_pagado }}</span>
                   @if (tenant.estado_pago === 'pagado') {
-                    <span style="color: #00ffaa; font-size: 0.75rem;">PAGADO</span>
+                    <span style="color: #00ffaa; font-size: 0.75rem;">{{ tenant.metodo_pago | uppercase }}</span>
                   } @else {
                     <span style="color: #aaa; font-size: 0.75rem;">GRATIS</span>
                   }

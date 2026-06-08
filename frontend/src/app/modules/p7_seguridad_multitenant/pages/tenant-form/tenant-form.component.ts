@@ -26,8 +26,8 @@ export class TenantFormComponent implements OnInit {
   constructor() {
     this.tenantForm = this.fb.group({
       nombre: ['', Validators.required],
-      dominio: [''],
-      estado: ['activo'],
+      slug: [''],
+      esta_activo: [true],
       email_admin: [''],
       plan: ['basico']
     });
@@ -60,18 +60,27 @@ export class TenantFormComponent implements OnInit {
 
     this.loading = true;
     this.error = '';
-    const payload = this.tenantForm.value;
+    const formVal = this.tenantForm.value;
+
+    // Auto-generar slug desde el nombre si no se proporcionó
+    if (!formVal.slug || formVal.slug.trim() === '') {
+      formVal.slug = formVal.nombre
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
 
     if (this.tenantId) {
-      this.http.put(`${environment.apiUrl}/tenants/${this.tenantId}`, payload).subscribe({
+      this.http.patch(`${environment.apiUrl}/tenants/${this.tenantId}`, formVal).subscribe({
         next: () => this.router.navigate(['/tenants']),
-        error: (err) => { this.error = 'Error actualizando'; this.loading = false; }
+        error: (err) => { this.error = err.error?.detail || 'Error actualizando'; this.loading = false; }
       });
     } else {
-      this.http.post(`${environment.apiUrl}/tenants/`, payload).subscribe({
+      this.http.post(`${environment.apiUrl}/tenants/`, formVal).subscribe({
         next: () => this.router.navigate(['/tenants']),
-        error: (err) => { this.error = 'Error creando'; this.loading = false; }
+        error: (err) => { this.error = err.error?.detail || 'Error creando'; this.loading = false; }
       });
     }
   }
 }
+

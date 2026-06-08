@@ -310,7 +310,39 @@ class TenantService:
 
     @staticmethod
     def superadmin_upgrade_tenant(db: Session, tenant_id: int, superadmin_id: int, nuevo_plan: str, metodo_pago: str, monto: float, background_tasks: BackgroundTasks = None) -> Tenant:
-        # Llamamos a confirm_upgrade_tenant para que actualice y notifique al dueño del tenant
+        if metodo_pago == "tarjeta":
+            # Si el pago es online por tarjeta, delegamos a Stripe igual que un upgrade normal
+            # pero la URL de éxito debe apuntar a la vista de tenants del Superadmin
+            tenant = TenantService.get_tenant_by_id(db, tenant_id)
+            from app.shared.config import settings
+            import stripe
+            
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            frontend_url = "https://rutaigeoproxi-frontend.onrender.com" if not settings.DEBUG_RESET_TOKEN else "http://localhost:4200"
+            
+            # Pasamos los datos por URL para confirmarlo a la vuelta
+            success_url = f"{frontend_url}/tenants?payment_success=true&tenant_id={tenant_id}&plan={nuevo_plan}&monto={monto}"
+            cancel_url = f"{frontend_url}/tenants?payment_cancelled=true"
+            
+            session = stripe.checkout.Session.create(
+                line_items=[{
+                    'price_data': {
+                        'currency': 'usd',
+                        'product_data': {'name': f"Suscripción {nuevo_plan.capitalize()} - {tenant.nombre}"},
+                        'unit_amount': int(monto * 100),
+                    },
+                    'quantity': 1,
+                }],
+                mode='payment',
+                success_url=success_url,
+                cancel_url=cancel_url,
+                client_reference_id=str(tenant.id)
+            )
+            tenant.checkout_url = session.url
+            db.commit()
+            return tenant
+            
+        # Si es manual (Efectivo / QR), procesamos inmediatamente
         tenant = TenantService.confirm_upgrade_tenant(db, tenant_id, superadmin_id, nuevo_plan, metodo_pago, monto)
         
         # Luego notificamos al superadmin que cobró

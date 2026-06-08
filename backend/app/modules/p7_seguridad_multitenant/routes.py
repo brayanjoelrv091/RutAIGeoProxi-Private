@@ -127,6 +127,26 @@ def superadmin_upgrade_tenant(
         background_tasks=background_tasks
     )
 
+@router.post("/{tenant_id}/superadmin-upgrade-confirm", response_model=TenantOut, summary="Confirmar Stripe por Superadmin")
+def superadmin_upgrade_tenant_confirm(
+    tenant_id: int,
+    schema: TenantSuperadminUpgradeRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(admin_dep),
+):
+    if current_user.tenant_id is not None:
+        raise HTTPException(status_code=403, detail="Solo el Superadministrador global puede realizar upgrades manuales.")
+        
+    return TenantService.confirm_upgrade_tenant(
+        db=db,
+        tenant_id=tenant_id,
+        usuario_id=current_user.id,
+        nuevo_plan=schema.nuevo_plan,
+        metodo_pago=schema.metodo_pago,
+        monto=schema.monto_pago
+    )
+
 @router.post("/{tenant_id}/members", response_model=MembershipOut, summary="Agregar miembro al Tenant")
 def add_member(
     tenant_id: int,

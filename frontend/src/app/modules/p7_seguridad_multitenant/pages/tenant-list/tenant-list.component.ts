@@ -1,6 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../../environment';
@@ -13,6 +13,7 @@ export interface Tenant {
   plan: string;
   estado_pago: string;
   metodo_pago?: string;
+  checkout_url?: string;
   creado_en: string;
 }
 
@@ -25,6 +26,8 @@ export interface Tenant {
 })
 export class TenantListComponent implements OnInit {
   http = inject(HttpClient);
+  route = inject(ActivatedRoute);
+  router = inject(Router);
   tenants: Tenant[] = [];
   loading = true;
 
@@ -37,8 +40,34 @@ export class TenantListComponent implements OnInit {
   upgradeLoading = false;
   upgradeError = '';
 
+  // Variables de feedback (Success Stripe)
+  paymentSuccessMsg = '';
+
   ngOnInit() {
-    this.loadTenants();
+    this.route.queryParams.subscribe(params => {
+      if (params['payment_success'] === 'true' && params['tenant_id']) {
+        // Regresando de Stripe: Confirmar
+        this.paymentSuccessMsg = 'Confirmando pago en línea...';
+        this.http.post(`${environment.apiUrl}/tenants/${params['tenant_id']}/superadmin-upgrade-confirm`, {
+          nuevo_plan: params['plan'],
+          metodo_pago: 'tarjeta',
+          monto_pago: parseFloat(params['monto'] || '0')
+        }).subscribe({
+          next: () => {
+            this.paymentSuccessMsg = '¡Pago registrado y plan actualizado exitosamente!';
+            setTimeout(() => { this.paymentSuccessMsg = ''; this.router.navigate(['/tenants']); }, 5000);
+            this.loadTenants();
+          },
+          error: (err) => {
+            console.error('Error confirming stripe payment:', err);
+            this.upgradeError = 'Error al confirmar pago de Stripe.';
+            this.paymentSuccessMsg = '';
+          }
+        });
+      } else {
+        this.loadTenants();
+      }
+    });
   }
 
   loadTenants() {
@@ -85,9 +114,15 @@ export class TenantListComponent implements OnInit {
       monto_pago: this.upgradeMonto
     };
 
-    this.http.post(`${environment.apiUrl}/tenants/${this.selectedTenant.id}/superadmin-upgrade`, payload)
+    this.http.post<Tenant>(`${environment.apiUrl}/tenants/${this.selectedTenant.id}/superadmin-upgrade`, payload)
       .subscribe({
-        next: () => {
+        next: (res) => {
+          if (res.checkout_url) {
+            // Redirigir a Stripe
+            window.location.href = res.checkout_url;
+            return;
+          }
+          
           this.upgradeLoading = false;
           this.closeUpgradeModal();
           this.loadTenants(); // Recargar la lista

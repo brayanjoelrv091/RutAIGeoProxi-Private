@@ -64,7 +64,7 @@ def update_tenant(
 def upgrade_my_tenant(
     schema: TenantUpgradeRequest,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(admin_dep),
+    current_user: Usuario = Depends(require_roles("admin")),
 ):
     """Realiza un upgrade de plan para la organización actual del admin."""
     if not current_user.tenant_id:
@@ -80,7 +80,7 @@ def confirm_my_tenant_upgrade(
     schema: TenantUpgradeConfirmRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(admin_dep),
+    current_user: Usuario = Depends(require_roles("admin")),
 ):
     """Efectiviza el upgrade de plan y envía notificaciones tras validar el pago."""
     if not current_user.tenant_id:

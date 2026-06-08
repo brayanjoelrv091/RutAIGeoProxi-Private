@@ -56,6 +56,13 @@ class TenantService:
                 db.add(membership)
                 db.commit()
                 
+                # Para la defensa y pruebas: Imprimir la contraseña en los logs
+                print(f"==================================================")
+                print(f"TENANT CREADO: {db_tenant.nombre}")
+                print(f"USUARIO: {email_admin}")
+                print(f"CONTRASEÑA TEMPORAL: {temp_password}")
+                print(f"==================================================")
+                
                 # Enviar correo de credenciales en segundo plano para no bloquear
                 if background_tasks:
                     background_tasks.add_task(send_tenant_welcome_email, email_admin, db_tenant.nombre, temp_password)

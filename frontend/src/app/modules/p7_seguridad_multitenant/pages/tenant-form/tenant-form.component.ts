@@ -86,11 +86,17 @@ export class TenantFormComponent implements OnInit {
         error: (err) => { this.error = err.error?.detail || 'Error actualizando'; this.loading = false; }
       });
     } else {
-      this.http.post(`${environment.apiUrl}/tenants`, formVal).subscribe({
-        next: () => this.router.navigate(['/tenants']),
-        error: (err) => { this.error = err.error?.detail || 'Error creando'; this.loading = false; }
+      this.http.post<any>(`${environment.apiUrl}/tenants`, formVal).subscribe({
+      next: (res) => {
+        if (res.checkout_url) {
+          window.location.href = res.checkout_url;
+          return;
+        }
+        this.loading = false;
+        this.router.navigate(['/tenants']);
+      },
+      error: (err) => { this.error = err.error?.detail || 'Error creando'; this.loading = false; }
       });
     }
   }
 }
-

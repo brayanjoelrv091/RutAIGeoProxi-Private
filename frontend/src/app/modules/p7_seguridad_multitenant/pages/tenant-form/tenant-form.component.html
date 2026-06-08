@@ -59,7 +59,7 @@
           
           <!-- SECCIÓN DE PAGO (Solo visible si plan != basico) -->
           <div *ngIf="tenantForm.get('plan')?.value !== 'basico'" class="p-4 bg-indigo-50 border border-indigo-100 rounded-lg space-y-4 mt-4">
-            <h4 class="font-medium text-indigo-900 text-sm">Registro de Pago Manual (Presencial)</h4>
+            <h4 class="font-medium text-indigo-900 text-sm">Configuración de Pago</h4>
             
             <div class="grid grid-cols-2 gap-4">
               <div>
@@ -68,14 +68,21 @@
                         class="w-full px-3 py-2 border border-indigo-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500">
                   <option value="efectivo">💵 Efectivo (Cash)</option>
                   <option value="qr">📱 Transferencia / QR</option>
-                  <option value="tarjeta">💳 Tarjeta (POS Físico)</option>
+                  <option value="tarjeta">💳 Tarjeta (Stripe en línea)</option>
                 </select>
               </div>
               <div>
                 <label class="block text-sm font-medium text-indigo-800 mb-1">Monto Cobrado (USD)</label>
                 <input type="number" formControlName="monto_pago" 
-                       class="w-full px-3 py-2 border border-indigo-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500">
+                       class="w-full px-3 py-2 border border-indigo-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 font-bold text-lg">
               </div>
+            </div>
+            
+            <!-- VISUALIZADOR DE QR -->
+            <div *ngIf="tenantForm.get('metodo_pago')?.value === 'qr' && tenantForm.get('monto_pago')?.value > 0" class="mt-4 flex flex-col items-center justify-center p-3 bg-white rounded-lg border border-indigo-200">
+              <p class="text-xs font-bold text-indigo-800 mb-2 uppercase tracking-wide">Pídele al cliente que escanee</p>
+              <img [src]="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=CreacionTenant_Plan_' + tenantForm.get('plan')?.value + '_Monto_' + tenantForm.get('monto_pago')?.value" 
+                   alt="QR Code" class="w-32 h-32 border p-1 rounded bg-white">
             </div>
           </div>
           <!-- FIN SECCIÓN DE PAGO -->
@@ -88,9 +95,10 @@
           Cancelar
         </button>
         <button type="submit" [disabled]="tenantForm.invalid || loading"
-                class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center shadow-sm">
+                class="px-5 py-2.5 text-white rounded-lg font-medium transition-colors disabled:opacity-50 flex items-center shadow-sm"
+                [ngClass]="{'bg-indigo-600 hover:bg-indigo-700': tenantForm.get('metodo_pago')?.value === 'tarjeta' && !tenantId, 'bg-blue-600 hover:bg-blue-700': tenantForm.get('metodo_pago')?.value !== 'tarjeta' || tenantId}">
           <span *ngIf="loading" class="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
-          {{ tenantId ? 'Actualizar' : 'Crear' }} Tenant
+          {{ tenantId ? 'Actualizar' : (tenantForm.get('metodo_pago')?.value === 'tarjeta' && tenantForm.get('plan')?.value !== 'basico' ? 'Crear y Pagar con Stripe' : 'Crear Tenant') }}
         </button>
       </div>
     </form>

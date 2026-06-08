@@ -29,7 +29,10 @@ class TenantService:
         metodo_pago = schema.metodo_pago or "ninguno"
         
         if schema.plan != "basico" and schema.plan != "gratis":
-            estado_pago = "pagado" # Asumimos pago manual presencial
+            if metodo_pago == "tarjeta":
+                estado_pago = "pendiente"
+            else:
+                estado_pago = "pagado" # Asumimos pago manual presencial
             
         schema_dict["estado_pago"] = estado_pago
         schema_dict["monto_pago"] = monto_pago
@@ -41,8 +44,39 @@ class TenantService:
             db.commit()
             db.refresh(db_tenant)
             
-            # Crear historial si hubo pago manual
-            if estado_pago == "pagado":
+            # Si es pago por tarjeta (Stripe en línea), generar sesión
+            if metodo_pago == "tarjeta" and estado_pago == "pendiente":
+                from app.shared.config import settings
+                import stripe
+                
+                stripe.api_key = settings.STRIPE_SECRET_KEY
+                frontend_url = "https://rutaigeoproxi-frontend.onrender.com" if not settings.DEBUG_RESET_TOKEN else "http://localhost:4200"
+                
+                success_url = f"{frontend_url}/tenants?payment_success=true&tenant_id={db_tenant.id}&plan={schema.plan}&monto={monto_pago}"
+                cancel_url = f"{frontend_url}/tenants?payment_cancelled=true"
+                
+                try:
+                    session = stripe.checkout.Session.create(
+                        line_items=[{
+                            'price_data': {
+                                'currency': 'usd',
+                                'product_data': {'name': f"Suscripción {schema.plan.capitalize()} - {db_tenant.nombre}"},
+                                'unit_amount': int(monto_pago * 100),
+                            },
+                            'quantity': 1,
+                        }],
+                        mode='payment',
+                        success_url=success_url,
+                        cancel_url=cancel_url,
+                        client_reference_id=str(db_tenant.id)
+                    )
+                    db_tenant.checkout_url = session.url
+                    db.commit()
+                except Exception as e:
+                    print(f"Error en Stripe: {e}")
+            
+            # Crear historial si hubo pago manual presencial
+            elif estado_pago == "pagado":
                 from app.modules.p7_seguridad_multitenant.models import TenantSubscriptionHistory
                 nuevo_historial = TenantSubscriptionHistory(
                     tenant_id=db_tenant.id,

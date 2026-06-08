@@ -27,8 +27,7 @@ def _get_frontend_base_url() -> str:
     if settings.DEBUG_RESET_TOKEN:
         return "http://localhost:4200"
     # Intentar leer de variable de entorno, fallback a Vercel
-    import os
-    return os.getenv("FRONTEND_URL", "https://rutaigeoproxi.vercel.app")
+    return os.getenv("FRONTEND_URL", "https://rutaigeoproxi-frontend.onrender.com")
 
 
 def _send_email(msg: EmailMessage, context: str = "correo") -> None:

@@ -187,7 +187,7 @@ class AuthService:
                     }
                     
                     # URLs de exito y cancelación apuntan al frontend local o cloud
-                    frontend_url = "https://rutaigeoproxi.vercel.app" if not settings.DEBUG_RESET_TOKEN else "http://localhost:4200"
+                    frontend_url = "https://rutaigeoproxi-frontend.onrender.com" if not settings.DEBUG_RESET_TOKEN else "http://localhost:4200"
                     
                     session = stripe.checkout.Session.create(
                         line_items=[{

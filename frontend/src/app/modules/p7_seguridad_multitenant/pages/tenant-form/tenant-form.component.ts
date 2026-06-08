@@ -28,8 +28,10 @@ export class TenantFormComponent implements OnInit {
       nombre: ['', Validators.required],
       slug: [''],
       esta_activo: [true],
-      email_admin: [''],
-      plan: ['basico']
+      email_admin: ['', [Validators.required, Validators.email]],
+      plan: ['basico'],
+      metodo_pago: ['efectivo'],
+      monto_pago: [0]
     });
   }
 
@@ -39,6 +41,14 @@ export class TenantFormComponent implements OnInit {
       this.tenantId = +id;
       this.loadTenant();
     }
+
+    // Autocompletar monto sugerido al cambiar de plan
+    this.tenantForm.get('plan')?.valueChanges.subscribe(plan => {
+      let monto = 0;
+      if (plan === 'profesional') monto = 29;
+      if (plan === 'empresarial') monto = 99;
+      this.tenantForm.get('monto_pago')?.setValue(monto);
+    });
   }
 
   loadTenant() {

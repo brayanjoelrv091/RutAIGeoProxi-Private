@@ -93,6 +93,8 @@
               <a routerLink="/admin-users" class="admin-link">👥 Panel de Administración</a>
               <a routerLink="/incidents" class="admin-link">🚨 Todos los Incidentes</a>
               <a routerLink="/dashboard" class="admin-link">📊 Dashboard de KPIs (CU-27)</a>
+            }
+            @if (isSuperadmin) {
               <a routerLink="/tenants" class="admin-link">🏢 SaaS Global (Tenants) (CU-29)</a>
             }
             @if (isCliente) {

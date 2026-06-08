@@ -20,14 +20,47 @@ class TenantService:
     @staticmethod
     def create_tenant(db: Session, schema: TenantCreate, background_tasks: BackgroundTasks = None) -> Tenant:
         # Extraemos campos que no van al modelo Tenant
-        schema_dict = schema.model_dump(exclude={"email_admin", "dominio", "estado"})
+        schema_dict = schema.model_dump(exclude={"email_admin", "dominio", "estado", "metodo_pago", "monto_pago"})
         email_admin = schema.email_admin
+        
+        # Pagos manuales
+        estado_pago = "gratis"
+        monto_pago = schema.monto_pago or 0
+        metodo_pago = schema.metodo_pago or "ninguno"
+        
+        if schema.plan != "basico" and schema.plan != "gratis":
+            estado_pago = "pagado" # Asumimos pago manual presencial
+            
+        schema_dict["estado_pago"] = estado_pago
+        schema_dict["monto_pago"] = monto_pago
+        schema_dict["metodo_pago"] = metodo_pago
         
         db_tenant = Tenant(**schema_dict)
         try:
             db.add(db_tenant)
             db.commit()
             db.refresh(db_tenant)
+            
+            # Crear historial si hubo pago manual
+            if estado_pago == "pagado":
+                from app.modules.p7_seguridad_multitenant.models import TenantSubscriptionHistory
+                nuevo_historial = TenantSubscriptionHistory(
+                    tenant_id=db_tenant.id,
+                    plan=db_tenant.plan,
+                    estado_pago=estado_pago,
+                    metodo_pago=metodo_pago,
+                    monto_pago=monto_pago
+                )
+                db.add(nuevo_historial)
+                db.commit()
+                
+                # Notificar a superadmins (reutilizando función de p1)
+                try:
+                    from app.modules.p1_usuarios.services import notify_superadmins_bg
+                    if background_tasks:
+                        background_tasks.add_task(notify_superadmins_bg, db_tenant.nombre, db_tenant.plan, monto_pago, metodo_pago)
+                except ImportError:
+                    pass
             
             # CU-29: Si se envió un correo, crear el usuario administrador automáticamente
             if email_admin:
@@ -212,8 +245,14 @@ class TenantService:
         db.add(nuevo_historial)
         db.commit()
 
-        # Crear Notificación
-        mensaje_pago = "Tarjeta de crédito (Stripe)" if metodo_pago == "tarjeta" else "Transferencia QR"
+        # Crear texto de notificación
+        if metodo_pago == "tarjeta":
+            mensaje_pago = "Tarjeta de crédito (Stripe / POS)"
+        elif metodo_pago == "efectivo":
+            mensaje_pago = "Efectivo"
+        else:
+            mensaje_pago = "Transferencia QR"
+            
         fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         mensaje = (
@@ -224,41 +263,64 @@ class TenantService:
             f"Fecha y Hora: {fecha_hora}"
         )
 
-        nueva_notif = Notificacion(
-            usuario_id=usuario_id,
-            titulo="Suscripción Actualizada ✅",
-            mensaje=mensaje,
-            tipo="info",
-            leido=False
-        )
-        db.add(nueva_notif)
-        db.commit()
-
-        # Enviar Notificación Push (Si hay token)
+        # Obtener a los dueños/admins del tenant para notificarles
+        from app.modules.p7_seguridad_multitenant.models import TenantMembership
+        dueños = db.query(TenantMembership).filter(
+            TenantMembership.tenant_id == tenant_id,
+            TenantMembership.rol_en_tenant.in_(["owner", "admin"])
+        ).all()
+        
         from app.modules.p1_usuarios.models import Usuario
-        usuario = db.query(Usuario).filter(Usuario.id == usuario_id).first()
-        if usuario and usuario.fcm_token:
-            send_push_notification(
-                token=usuario.fcm_token,
-                title="Suscripción Actualizada ✅",
-                body=mensaje,
-                data={"type": "subscription_update", "plan": nuevo_plan}
+        import asyncio
+        
+        for dueño in dueños:
+            nueva_notif = Notificacion(
+                usuario_id=dueño.usuario_id,
+                titulo="Suscripción Actualizada ✅",
+                mensaje=mensaje,
+                tipo="info",
+                leido=False
             )
+            db.add(nueva_notif)
+            db.commit()
 
-        # Enviar Notificación WebSocket
+            usuario = db.query(Usuario).filter(Usuario.id == dueño.usuario_id).first()
+            if usuario and usuario.fcm_token:
+                send_push_notification(
+                    token=usuario.fcm_token,
+                    title="Suscripción Actualizada ✅",
+                    body=mensaje,
+                    data={"type": "subscription_update", "plan": nuevo_plan}
+                )
+
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(manager.send_personal_message(str(dueño.usuario_id), {
+                        "type": "notification",
+                        "title": "Suscripción Actualizada ✅",
+                        "message": mensaje,
+                        "plan": nuevo_plan
+                    }))
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Error sending WS notification: {e}")
+
+        return tenant
+
+    @staticmethod
+    def superadmin_upgrade_tenant(db: Session, tenant_id: int, superadmin_id: int, nuevo_plan: str, metodo_pago: str, monto: float, background_tasks: BackgroundTasks = None) -> Tenant:
+        # Llamamos a confirm_upgrade_tenant para que actualice y notifique al dueño del tenant
+        tenant = TenantService.confirm_upgrade_tenant(db, tenant_id, superadmin_id, nuevo_plan, metodo_pago, monto)
+        
+        # Luego notificamos al superadmin que cobró
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(manager.send_personal_message(usuario_id, {
-                    "type": "notification",
-                    "title": "Suscripción Actualizada ✅",
-                    "message": mensaje,
-                    "plan": nuevo_plan
-                }))
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Error sending WS notification: {e}")
-
+            from app.modules.p1_usuarios.services import notify_superadmins_bg
+            if background_tasks:
+                background_tasks.add_task(notify_superadmins_bg, tenant.nombre, nuevo_plan, monto, metodo_pago, True)
+        except ImportError:
+            pass
+            
         return tenant
 
     @staticmethod

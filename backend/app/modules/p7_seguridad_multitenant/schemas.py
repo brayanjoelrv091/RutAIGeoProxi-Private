@@ -13,7 +13,10 @@ class TenantBase(BaseModel):
     plan: str = "basico"
 
 class TenantCreate(TenantBase):
-    email_admin: str | None = Field(default=None, description="Email del primer administrador del tenant")
+    email_admin: str = Field(description="Email obligatorio del primer administrador del tenant")
+    metodo_pago: str | None = Field(default=None, description="Método de pago (efectivo, qr, tarjeta)")
+    monto_pago: float | None = Field(default=0, description="Monto cobrado en pago manual")
+    
     # Campos legacy del frontend viejo (se mapean automáticamente)
     dominio: str | None = None
     estado: str | None = None
@@ -85,3 +88,8 @@ class TenantUpgradeConfirmRequest(BaseModel):
     nuevo_plan: str
     metodo_pago: str
     monto: float
+
+class TenantSuperadminUpgradeRequest(BaseModel):
+    nuevo_plan: str
+    metodo_pago: str
+    monto_pago: float

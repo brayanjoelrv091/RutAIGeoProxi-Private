@@ -17,6 +17,7 @@
           <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">ID</th>
           <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Nombre</th>
           <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Dominio</th>
+          <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Suscripción</th>
           <th class="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
           <th class="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
         </tr>
@@ -31,12 +32,19 @@
             {{ tenant.dominio || 'N/A' }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap">
+            <div class="text-xs text-slate-700 font-bold uppercase">{{ tenant.plan || 'BÁSICO' }}</div>
+            <div class="text-xs text-slate-500">{{ tenant.estado_pago || 'GRATIS' }} <span *ngIf="tenant.metodo_pago && tenant.metodo_pago !== 'ninguno'">({{tenant.metodo_pago}})</span></div>
+          </td>
+          <td class="px-6 py-4 whitespace-nowrap">
             <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
                   [ngClass]="{'bg-green-100 text-green-800': tenant.estado === 'activo', 'bg-red-100 text-red-800': tenant.estado === 'inactivo'}">
               {{ tenant.estado | uppercase }}
             </span>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+            <button (click)="openUpgradeModal(tenant)" class="text-emerald-600 hover:text-emerald-900 bg-emerald-50 px-3 py-1.5 rounded-md hover:bg-emerald-100 transition-colors">
+              💳 Pagar/Upgrade
+            </button>
             <a [routerLink]="['/tenants/form', tenant.id]" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 px-3 py-1.5 rounded-md hover:bg-indigo-100 transition-colors">Editar</a>
           </td>
         </tr>
@@ -45,5 +53,64 @@
         </tr>
       </tbody>
     </table>
+  </div>
+
+  <!-- Modal de Upgrade Manual (Superadmin) -->
+  <div *ngIf="showUpgradeModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 bg-opacity-50">
+    <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+      <div class="flex justify-between items-center mb-4 border-b pb-3">
+        <h3 class="text-lg font-bold text-slate-800">Gestionar Pago / Plan</h3>
+        <button (click)="closeUpgradeModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl">&times;</button>
+      </div>
+
+      <div class="mb-4">
+        <p class="text-sm text-slate-600">Tenant: <span class="font-bold text-slate-900">{{ selectedTenant?.nombre }}</span></p>
+        <p class="text-sm text-slate-600">Plan Actual: <span class="font-bold text-slate-900 uppercase">{{ selectedTenant?.plan || 'BÁSICO' }}</span></p>
+        <p class="text-sm text-slate-600">Estado Pago: <span class="font-bold text-slate-900 uppercase">{{ selectedTenant?.estado_pago || 'GRATIS' }}</span></p>
+      </div>
+
+      <div *ngIf="upgradeError" class="mb-4 p-3 bg-rose-50 text-rose-700 text-sm rounded border border-rose-200">
+        {{ upgradeError }}
+      </div>
+
+      <form (ngSubmit)="confirmUpgrade()" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Nuevo Plan</label>
+          <select [(ngModel)]="upgradePlan" name="upgradePlan" (change)="updateSuggestedMonto()"
+                  class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+            <option value="basico">Básico (Gratis)</option>
+            <option value="profesional">Profesional ($29)</option>
+            <option value="empresarial">Empresarial ($99)</option>
+          </select>
+        </div>
+
+        <div *ngIf="upgradePlan !== 'basico'" class="p-3 bg-emerald-50 rounded-lg border border-emerald-100 space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-emerald-800 mb-1">Método de Pago Recibido</label>
+            <select [(ngModel)]="upgradeMetodo" name="upgradeMetodo"
+                    class="w-full px-3 py-2 border border-emerald-200 rounded bg-white focus:ring-2 focus:ring-emerald-500">
+              <option value="efectivo">💵 Efectivo (Cash)</option>
+              <option value="qr">📱 Transferencia / QR</option>
+              <option value="tarjeta">💳 Tarjeta (POS Físico)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-emerald-800 mb-1">Monto Cobrado (USD)</label>
+            <input type="number" [(ngModel)]="upgradeMonto" name="upgradeMonto"
+                   class="w-full px-3 py-2 border border-emerald-200 rounded bg-white focus:ring-2 focus:ring-emerald-500">
+          </div>
+        </div>
+
+        <div class="pt-4 flex justify-end space-x-2">
+          <button type="button" (click)="closeUpgradeModal()" class="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded font-medium">
+            Cancelar
+          </button>
+          <button type="submit" [disabled]="upgradeLoading" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-medium flex items-center">
+            <span *ngIf="upgradeLoading" class="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></span>
+            Procesar Pago
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>

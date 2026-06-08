@@ -102,6 +102,31 @@ def confirm_my_tenant_upgrade(
     
     return tenant
 
+from app.modules.p7_seguridad_multitenant.schemas import TenantSuperadminUpgradeRequest
+
+@router.post("/{tenant_id}/superadmin-upgrade", response_model=TenantOut, summary="Upgrade manual por el Superadmin (CU-29)")
+def superadmin_upgrade_tenant(
+    tenant_id: int,
+    schema: TenantSuperadminUpgradeRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(admin_dep),
+):
+    """El Superadmin fuerza el upgrade de un tenant y registra el pago manual."""
+    # Validación extra: Solo un superadmin puede hacer esto
+    if current_user.tenant_id is not None:
+        raise HTTPException(status_code=403, detail="Solo el Superadministrador global puede realizar upgrades manuales.")
+        
+    return TenantService.superadmin_upgrade_tenant(
+        db=db,
+        tenant_id=tenant_id,
+        superadmin_id=current_user.id,
+        nuevo_plan=schema.nuevo_plan,
+        metodo_pago=schema.metodo_pago,
+        monto=schema.monto_pago,
+        background_tasks=background_tasks
+    )
+
 @router.post("/{tenant_id}/members", response_model=MembershipOut, summary="Agregar miembro al Tenant")
 def add_member(
     tenant_id: int,

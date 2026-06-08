@@ -5,7 +5,7 @@ SMTP_SERVER = "smtp-relay.brevo.com"
 SMTP_PORT = 587
 SMTP_USER = "a8732b001@smtp-brevo.com"
 SMTP_PASSWORD = "xsmtpsib-1613a92b56bbf3291c9abb38d9738cd0ac2d8c8e3aabbab965f0d9617c23756e-jr1DXpWPqKGlm56m"
-FROM_EMAIL = "no-reply@rutaigeoproxi.com" # This is what he probably still has
+FROM_EMAIL = "si2psicologiaproy@gmail.com"
 TO_EMAIL = "brayanjoelrv091@gmail.com"
 
 msg = EmailMessage()

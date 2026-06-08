@@ -272,6 +272,22 @@ def patch_saas_db():
         import traceback
         return {"status": "error", "detalle": str(e), "trace": traceback.format_exc()}
 
+@app.get("/api/v1/test-email", tags=["Mantenimiento"])
+def test_email(to_email: str = "brayanjoelrv091@gmail.com"):
+    """Ruta temporal para probar el envío de correo de forma síncrona y ver el error real."""
+    from app.shared.email import send_reset_email
+    import traceback
+    try:
+        send_reset_email(to_email, "TEST-TOKEN-12345")
+        return {"status": "success", "message": f"Correo enviado síncronamente a {to_email}"}
+    except Exception as e:
+        return {
+            "status": "error", 
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+            "traceback": traceback.format_exc()
+        }
+
 @app.get("/api/v1/bootstrap-superadmin", tags=["Mantenimiento"])
 def bootstrap_superadmin():
     """Ruta temporal para crear o resetear el SuperAdmin."""

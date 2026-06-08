@@ -4,6 +4,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from './modules/p1_usuarios/auth.service';
 import { WebSocketService } from './modules/shared/websocket.service';
+import { environment } from './environment';
 
 @Component({
   selector: 'app-root',
@@ -19,7 +20,7 @@ export class AppComponent implements OnInit {
   private readonly http = inject(HttpClient);
   
   // Use config to fallback if environment is missing
-  private apiUrl = 'https://rutai-backend.onrender.com';
+  private apiUrl = environment.apiUrl;
   
   menuOpen = false;
   isDarkTheme = true;

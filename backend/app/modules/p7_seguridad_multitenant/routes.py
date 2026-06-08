@@ -2,7 +2,7 @@
 P7 — Rutas de Administración Multi-Tenant.
 """
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.shared.deps import get_current_user, get_db, require_roles
@@ -25,11 +25,12 @@ admin_dep = require_roles("admin")
 @router.post("", response_model=TenantOut, status_code=status.HTTP_201_CREATED, summary="Crear un nuevo Tenant")
 def create_tenant(
     schema: TenantCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _current: Usuario = Depends(admin_dep),
 ):
     """CU29 · Administrador global crea una nueva organización."""
-    return TenantService.create_tenant(db, schema)
+    return TenantService.create_tenant(db, schema, background_tasks)
 
 
 @router.get("", response_model=list[TenantOut], summary="Listar todos los Tenants")

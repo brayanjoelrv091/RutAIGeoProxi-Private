@@ -14,9 +14,11 @@ from app.shared.security import get_password_hash
 from app.modules.p1_usuarios.models import Usuario
 from app.shared.email import send_tenant_welcome_email
 
+from fastapi import BackgroundTasks
+
 class TenantService:
     @staticmethod
-    def create_tenant(db: Session, schema: TenantCreate) -> Tenant:
+    def create_tenant(db: Session, schema: TenantCreate, background_tasks: BackgroundTasks = None) -> Tenant:
         # Extraemos campos que no van al modelo Tenant
         schema_dict = schema.model_dump(exclude={"email_admin", "dominio", "estado"})
         email_admin = schema.email_admin
@@ -54,8 +56,11 @@ class TenantService:
                 db.add(membership)
                 db.commit()
                 
-                # Enviar correo de credenciales
-                send_tenant_welcome_email(email_admin, db_tenant.nombre, temp_password)
+                # Enviar correo de credenciales en segundo plano para no bloquear
+                if background_tasks:
+                    background_tasks.add_task(send_tenant_welcome_email, email_admin, db_tenant.nombre, temp_password)
+                else:
+                    send_tenant_welcome_email(email_admin, db_tenant.nombre, temp_password)
                 
             return db_tenant
         except IntegrityError:

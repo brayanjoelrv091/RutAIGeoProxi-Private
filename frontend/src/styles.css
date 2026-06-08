@@ -50,6 +50,9 @@ body.light-theme .text-gray-600 { color: #9CA3AF !important; }
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
 }
 
 body {
@@ -58,6 +61,8 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
   min-height: 100vh;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 input, select, textarea {

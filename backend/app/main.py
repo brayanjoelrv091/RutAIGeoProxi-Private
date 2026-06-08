@@ -150,6 +150,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── Security & Cache Headers ──
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Agrega headers de seguridad y cache recomendados por Lighthouse/webhint."""
+
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        # Evitar MIME-type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        # Cache-Control para API responses (no cachear datos dinámicos)
+        if "Cache-Control" not in response.headers:
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        # Remover header deprecated que causa warnings
+        response.headers.pop("X-XSS-Protection", None)
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
 # ── Servir archivos estáticos (uploads locales) ──
 if settings.UPLOAD_DIR.exists():
     app.mount(

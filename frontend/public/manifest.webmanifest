@@ -1,9 +1,15 @@
 {
-  "name": "frontend",
-  "short_name": "frontend",
+  "name": "RutAIGeoProxi",
+  "short_name": "RutAI",
+  "description": "Plataforma SaaS de gestión inteligente de rutas, geolocalización y proximidad para talleres.",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "scope": "./",
   "start_url": "./",
+  "theme_color": "#0A0E1A",
+  "background_color": "#0A0E1A",
+  "lang": "es",
+  "categories": ["business", "utilities"],
   "icons": [
     {
       "src": "icons/icon-72x72.png",

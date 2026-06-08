@@ -17,9 +17,9 @@ from app.shared.email import send_tenant_welcome_email
 class TenantService:
     @staticmethod
     def create_tenant(db: Session, schema: TenantCreate) -> Tenant:
-        # Extraemos email_admin si existe y lo removemos del dict para Tenant
-        schema_dict = schema.model_dump()
-        email_admin = schema_dict.pop("email_admin", None)
+        # Extraemos campos que no van al modelo Tenant
+        schema_dict = schema.model_dump(exclude={"email_admin", "dominio", "estado"})
+        email_admin = schema.email_admin
         
         db_tenant = Tenant(**schema_dict)
         try:

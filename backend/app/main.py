@@ -168,7 +168,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if "Cache-Control" not in response.headers:
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         # Remover header deprecated que causa warnings
-        response.headers.pop("X-XSS-Protection", None)
+        if "X-XSS-Protection" in response.headers:
+            del response.headers["X-XSS-Protection"]
         return response
 
 

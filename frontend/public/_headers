@@ -1,0 +1,23 @@
+/*
+  Render Static Site — Custom Headers
+  Docs: https://render.com/docs/static-sites#custom-headers
+*/
+
+/*
+  X-Content-Type-Options: nosniff
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/manifest.webmanifest
+  Content-Type: application/manifest+json; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate
+
+/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

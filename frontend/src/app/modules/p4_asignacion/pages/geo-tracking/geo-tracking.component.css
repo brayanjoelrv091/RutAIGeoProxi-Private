@@ -81,6 +81,7 @@
 
 .tecnico-card {
   background: rgba(10, 10, 20, 0.9);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   padding: 15px;
   border-radius: 12px;

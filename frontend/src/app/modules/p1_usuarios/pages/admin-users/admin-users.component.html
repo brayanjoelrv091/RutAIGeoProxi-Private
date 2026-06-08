@@ -47,7 +47,7 @@
                   @if (user.rol === 'admin' && !user.tenant_id) {
                     <span class="tech-text" style="color: #00ffff; font-weight: bold; padding: 6px 12px; background: rgba(0, 255, 255, 0.1); border-radius: 4px; border: 1px solid #00ffff;">SUPERADMIN</span>
                   } @else {
-                    <select class="tech-select" [ngModel]="user.rol" (ngModelChange)="changeRole(user, $event)">
+                    <select class="tech-select" [ngModel]="user.rol" (ngModelChange)="changeRole(user, $event)" title="Cambiar rol del usuario" [attr.aria-label]="'Rol de ' + user.nombre">
                       @for (r of roles; track r) {
                         <option [value]="r">{{ r | titlecase }}</option>
                       }

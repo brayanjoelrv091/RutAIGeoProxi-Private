@@ -10,19 +10,19 @@
 
       <form [formGroup]="form" (ngSubmit)="submit()" class="tech-form-vertical">
         <div class="form-group">
-          <label>Nombre Completo</label>
-          <input type="text" formControlName="nombre" placeholder="Juan Pérez" />
+          <label for="reg-nombre">Nombre Completo</label>
+          <input id="reg-nombre" name="nombre" type="text" formControlName="nombre" placeholder="Juan Pérez" />
         </div>
 
         <div class="form-group">
-          <label>Correo Electrónico</label>
-          <input type="email" formControlName="email" autocomplete="email" placeholder="ejemplo&#64;correo.com" />
+          <label for="reg-email">Correo Electrónico</label>
+          <input id="reg-email" name="email" type="email" formControlName="email" autocomplete="email" placeholder="ejemplo&#64;correo.com" />
         </div>
 
         <div class="form-group">
-          <label>Contraseña</label>
+          <label for="reg-password">Contraseña</label>
           <div class="password-wrapper" style="position: relative;">
-            <input [type]="showPassword ? 'text' : 'password'" formControlName="password" autocomplete="new-password" placeholder="••••••••" [class.input-error]="form.controls.password.invalid && form.controls.password.touched" style="width: 100%; padding-right: 40px;" />
+            <input id="reg-password" name="password" [type]="showPassword ? 'text' : 'password'" formControlName="password" autocomplete="new-password" placeholder="••••••••" [class.input-error]="form.controls.password.invalid && form.controls.password.touched" style="width: 100%; padding-right: 40px;" />
             <button type="button" (click)="showPassword = !showPassword" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #00F2FF; cursor: pointer; font-size: 1.2rem;">
               <i class="fas" [ngClass]="showPassword ? 'fa-eye-slash' : 'fa-eye'"></i>
             </button>
@@ -62,8 +62,8 @@
           <div class="saas-section slide-down">
             <h3 class="tech-font cyan-text mt-3 text-center">Configuración de tu Red</h3>
             <div class="form-group mt-2">
-              <label>Nombre de la Empresa / Franquicia</label>
-              <input type="text" formControlName="tenant_name" placeholder="Ej: Red de Talleres Express" />
+              <label for="reg-tenant-name">Nombre de la Empresa / Franquicia</label>
+              <input id="reg-tenant-name" name="tenant_name" type="text" formControlName="tenant_name" placeholder="Ej: Red de Talleres Express" />
             </div>
 
             <label class="mt-2" style="display:block; text-align: center;">Elige tu Plan de Suscripción</label>

@@ -2,7 +2,7 @@
 .neon-title { color: var(--accent-cyan); text-align: center; margin-bottom: 0.3rem; font-size: 1.5rem; }
 .subtitle { text-align: center; color: var(--text-secondary); margin-bottom: 2rem; font-size: 0.85rem; letter-spacing: 2px; }
 .detail-grid { display: flex; flex-direction: column; gap: 1.2rem; }
-.glass-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1.5rem; backdrop-filter: blur(20px); }
+.glass-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 14px; padding: 1.5rem; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
 .section-title { color: var(--accent-cyan); font-size: 1rem; margin-bottom: 1rem; letter-spacing: 1px; }
 .info-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
 .info-row span:first-child { color: var(--text-secondary); min-width: 100px; }

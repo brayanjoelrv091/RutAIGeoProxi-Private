@@ -300,7 +300,30 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
     }
   }
 
+  Future<List<String>> _copyFilesToPersistentStorage(List<File> files) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final persistentPaths = <String>[];
+    for (var file in files) {
+      final fileName = file.path.split('/').last;
+      final newPath = '${dir.path}/${const Uuid().v4()}_$fileName';
+      final newFile = await file.copy(newPath);
+      persistentPaths.add(newFile.path);
+    }
+    return persistentPaths;
+  }
+
   Future<void> _saveToOfflineQueue() async {
+    List<String>? persistentImagePaths;
+    if (_imageFiles.isNotEmpty) {
+      persistentImagePaths = await _copyFilesToPersistentStorage(_imageFiles);
+    }
+
+    String? persistentAudioPath;
+    if (_audioFile != null) {
+      final res = await _copyFilesToPersistentStorage([_audioFile!]);
+      if (res.isNotEmpty) persistentAudioPath = res.first;
+    }
+
     final offlineItem = OfflineIncident(
       idempotencyKey: const Uuid().v4(),
       titulo: _titleController.text,
@@ -311,8 +334,8 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
       createdAtLocal: DateTime.now().toUtc().toIso8601String(),
       tipoBusqueda: _tipoBusqueda,
       tallerPreferidoId: _tallerPreferidoId,
-      imagePaths: _imageFiles.isEmpty ? null : _imageFiles.map((e) => e.path).toList(),
-      audioPath: _audioFile?.path,
+      imagePaths: persistentImagePaths,
+      audioPath: persistentAudioPath,
     );
 
     await OfflineQueue.enqueue(offlineItem);

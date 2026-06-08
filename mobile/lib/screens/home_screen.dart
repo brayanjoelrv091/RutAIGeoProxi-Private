@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../backend.dart';
 import 'map_explorer_screen.dart';
+import 'workshop_explorer_screen.dart';
+import 'quotation_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.onLogout});
@@ -123,9 +125,40 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
                     icon: const Icon(Icons.explore, color: Colors.black),
-                    label: const Text('🗺️ Explorar Mapa y Talleres', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    label: const Text('🗺️ Explorar Mapa (Global)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00F2FF),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const WorkshopExplorerScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.build_circle, color: Colors.black),
+                    label: const Text('🔧 Buscar Talleres (CU-31)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00E676),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      // Usamos ID=1 como prueba para la cotización
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const QuotationDetailScreen(incidentId: 1)),
+                      );
+                    },
+                    icon: const Icon(Icons.request_quote, color: Colors.black),
+                    label: const Text('📄 Ver Cotización de Prueba (CU-30/32)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFB74D),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),

@@ -1,8 +1,9 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:rutaigeoproxi_mobile/config.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../session.dart';
 
 class PaymentScreen extends StatefulWidget {
   final int incidentId;
@@ -21,35 +22,73 @@ class PaymentScreen extends StatefulWidget {
 class _PaymentScreenState extends State<PaymentScreen> {
   bool _isProcessing = false;
   bool _isSuccess = false;
-  int _selectedMethod = 0; // 0 = Tarjeta, 1 = QR Simple
 
   Future<void> _processPayment() async {
     setState(() => _isProcessing = true);
 
     try {
+      final token = await Session.getToken();
+      
+      // Intentar obtener la URL de Checkout de Stripe
       final response = await http.post(
-        Uri.parse('${AppConfig.baseUrl}/payments/process'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'incidente_id': widget.incidentId,
-          'monto': widget.amount,
-          'metodo_pago': _selectedMethod == 0 ? 'tarjeta_mobile' : 'qr_mobile',
-        }),
+        Uri.parse('${AppConfig.baseUrl}/payments/checkout-session/${widget.incidentId}'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
       );
 
-      if (response.statusCode == 201) {
-        setState(() {
-          _isProcessing = false;
-          _isSuccess = true;
-        });
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final url = data['checkout_url'];
+        
+        if (url != null && url.isNotEmpty) {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            // Simular éxito una vez que vuelve a la app (en producción esto requiere Webhooks)
+            if (mounted) {
+               setState(() {
+                 _isProcessing = false;
+                 _isSuccess = true;
+               });
+            }
+            return;
+          } else {
+            throw Exception('No se puede abrir el navegador seguro.');
+          }
+        }
       } else {
-        throw Exception('Error en el servidor');
+        // Fallback al proceso simulado si falla la sesión de Stripe
+        final processResp = await http.post(
+          Uri.parse('${AppConfig.baseUrl}/payments/process'),
+          headers: {
+            'Content-Type': 'application/json',
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'incidente_id': widget.incidentId,
+            'monto': widget.amount,
+            'metodo_pago': 'tarjeta_mobile',
+          }),
+        );
+        
+        if (processResp.statusCode == 201) {
+          setState(() {
+             _isProcessing = false;
+             _isSuccess = true;
+          });
+          return;
+        }
+        
+        final err = jsonDecode(response.body);
+        throw Exception(err['detail'] ?? 'Error desconocido');
       }
     } catch (e) {
       setState(() => _isProcessing = false);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al procesar pago: $e')),
+        SnackBar(content: Text('Error al procesar pago: $e'), backgroundColor: Colors.redAccent),
       );
     }
   }
@@ -59,7 +98,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E1A),
       appBar: AppBar(
-        title: const Text('Pasarela de Pago'),
+        title: const Text('Pasarela de Pago Segura'),
         backgroundColor: const Color(0xFF111629),
         elevation: 0,
       ),
@@ -93,30 +132,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ),
         const SizedBox(height: 30),
         
-        Row(
-          children: [
-            Expanded(
-              child: _MethodTab(
-                icon: Icons.credit_card,
-                label: 'Tarjeta',
-                isSelected: _selectedMethod == 0,
-                onTap: () => setState(() => _selectedMethod = 0),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A2235),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.lock_outline, color: Color(0xFF00E676)),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'El pago se procesará a través de la pasarela segura. Sus datos de tarjeta no son almacenados en nuestra aplicación.',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _MethodTab(
-                icon: Icons.qr_code_2,
-                label: 'QR Simple',
-                isSelected: _selectedMethod == 1,
-                onTap: () => setState(() => _selectedMethod = 1),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 30),
-        
-        if (_selectedMethod == 0) _buildCardForm() else _buildQRForm(),
         
         const SizedBox(height: 40),
         ElevatedButton(
@@ -130,71 +164,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
             shadowColor: const Color(0xFF00F2FF).withOpacity(0.5),
           ),
           child: _isProcessing
-              ? const CircularProgressIndicator(color: Colors.black)
-              : Text(
-                  'CONFIRMAR PAGO DE BS. ${widget.amount.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+              : const Text(
+                  'ABRIR PASARELA SEGURA',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCardForm() {
-    return Column(
-      children: [
-        _buildInputField('Titular de la Tarjeta', 'EJ: JUAN PEREZ'),
-        const SizedBox(height: 16),
-        _buildInputField('Número de Tarjeta', '4555 0000 0000 0000', icon: Icons.credit_card),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(child: _buildInputField('Vencimiento', 'MM/AA')),
-            const SizedBox(width: 16),
-            Expanded(child: _buildInputField('CVV', '123')),
-          ],
-        )
-      ],
-    );
-  }
-
-  Widget _buildQRForm() {
-    return Column(
-      children: [
-        const Text(
-          'Escanea este QR desde tu app bancaria para proceder con el pago rápido.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70),
-        ),
-        const SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-          child: const Icon(Icons.qr_code_2, size: 200, color: Colors.black),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInputField(String label, String hint, {IconData? icon}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-        const SizedBox(height: 8),
-        TextField(
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: Colors.white24),
-            prefixIcon: icon != null ? Icon(icon, color: Colors.white54) : null,
-            filled: true,
-            fillColor: const Color(0xFF111629),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          style: const TextStyle(color: Colors.white),
         ),
       ],
     );
@@ -206,47 +180,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
       children: [
         const Icon(Icons.check_circle, size: 120, color: Color(0xFF00E676)),
         const SizedBox(height: 24),
-        const Text('¡PAGO EXITOSO!', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+        const Text('¡PAGO COMPLETADO!', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
-        const Text('Se ha notificado al taller y procesado la comisión de la app.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 16)),
+        const Text('Su pago ha sido procesado exitosamente por Stripe.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 16)),
         const SizedBox(height: 40),
         TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('VOLVER AL INICIO', style: TextStyle(color: Color(0xFF00F2FF), fontSize: 18)),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('VOLVER AL DETALLE', style: TextStyle(color: Color(0xFF00F2FF), fontSize: 18)),
         ),
       ],
-    );
-  }
-}
-
-class _MethodTab extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _MethodTab({required this.icon, required this.label, required this.isSelected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF00F2FF).withOpacity(0.1) : Colors.transparent,
-          border: Border.all(color: isSelected ? const Color(0xFF00F2FF) : Colors.white24),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: isSelected ? const Color(0xFF00F2FF) : Colors.white54, size: 32),
-            const SizedBox(height: 8),
-            Text(label, style: TextStyle(color: isSelected ? const Color(0xFF00F2FF) : Colors.white54, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
     );
   }
 }

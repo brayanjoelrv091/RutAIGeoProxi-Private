@@ -17,6 +17,7 @@ interface Tenant {
   metodo_pago: string;
   monto_pago: number;
   admin_nombre: string;
+  admin_email: string;
   historial_suscripciones?: any[];
   expanded?: boolean;
 }

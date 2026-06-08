@@ -42,7 +42,12 @@
             <tr>
               <td class="tech-id">#{{ tenant.id }}</td>
               <td><strong>{{ tenant.nombre }}</strong></td>
-              <td style="color: #888;">{{ tenant.admin_nombre }}</td>
+              <td>
+                <div style="display: flex; flex-direction: column;">
+                  <span style="color: #ccc;">{{ tenant.admin_nombre }}</span>
+                  <span style="color: #888; font-size: 0.8rem;">{{ tenant.admin_email }}</span>
+                </div>
+              </td>
               <td>
                 <span class="badge" [ngClass]="{
                   'badge-basico': tenant.plan === 'basico',

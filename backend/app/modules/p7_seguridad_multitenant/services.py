@@ -77,6 +77,9 @@ class TenantService:
             
             # Crear historial si hubo pago manual presencial
             elif estado_pago == "pagado":
+                from datetime import datetime, timezone, timedelta
+                db_tenant.fecha_fin_plan = datetime.now(timezone.utc) + timedelta(days=30)
+                
                 from app.modules.p7_seguridad_multitenant.models import TenantSubscriptionHistory
                 nuevo_historial = TenantSubscriptionHistory(
                     tenant_id=db_tenant.id,
@@ -265,6 +268,14 @@ class TenantService:
         tenant.metodo_pago = metodo_pago
         tenant.monto_pago = int(monto)
         tenant.checkout_url = None
+        
+        # Actualizar fecha de expiracion a 30 dias desde hoy si es de pago
+        from datetime import timedelta
+        if nuevo_plan != "gratis":
+            tenant.fecha_fin_plan = datetime.now(timezone.utc) + timedelta(days=30)
+        else:
+            tenant.fecha_fin_plan = None
+            
         db.commit()
         db.refresh(tenant)
 

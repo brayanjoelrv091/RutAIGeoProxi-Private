@@ -27,6 +27,7 @@ class TenantOut(BaseModel):
     metodo_pago: str = "ninguno"
     monto_pago: int = 0
     admin_nombre: str | None = None
+    admin_email: str | None = None
     historial_suscripciones: List[TenantSubscriptionHistoryOut] = []
     
     class Config:
@@ -98,8 +99,10 @@ def list_all_tenants(
         if membership:
             owner = db.query(Usuario).filter(Usuario.id == membership.usuario_id).first()
             setattr(t, "admin_nombre", owner.nombre if owner else "Desconocido")
+            setattr(t, "admin_email", owner.email if owner else "Desconocido")
         else:
             setattr(t, "admin_nombre", "Desconocido")
+            setattr(t, "admin_email", "Desconocido")
     return tenants
 
 @router.patch("/tenants/{tenant_id}/status", response_model=TenantOut, summary="Activar o suspender un tenant (Solo SuperAdmin)")

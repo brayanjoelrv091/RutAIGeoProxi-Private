@@ -25,7 +25,7 @@ export class TenantListComponent implements OnInit {
   loading = true;
 
   ngOnInit() {
-    this.http.get<Tenant[]>(`${environment.apiUrl}/tenants/`).subscribe({
+    this.http.get<Tenant[]>(`${environment.apiUrl}/tenants`).subscribe({
       next: (data) => {
         this.tenants = data;
         this.loading = false;

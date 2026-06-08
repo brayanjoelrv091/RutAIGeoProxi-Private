@@ -76,7 +76,7 @@ export class TenantFormComponent implements OnInit {
         error: (err) => { this.error = err.error?.detail || 'Error actualizando'; this.loading = false; }
       });
     } else {
-      this.http.post(`${environment.apiUrl}/tenants/`, formVal).subscribe({
+      this.http.post(`${environment.apiUrl}/tenants`, formVal).subscribe({
         next: () => this.router.navigate(['/tenants']),
         error: (err) => { this.error = err.error?.detail || 'Error creando'; this.loading = false; }
       });

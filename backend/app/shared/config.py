@@ -76,7 +76,7 @@ class Settings:
 
     # ── SMTP (Brevo) ───────────────────────────────────────────────────
     SMTP_SERVER: str = os.getenv("SMTP_SERVER", "smtp-relay.brevo.com")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "2525"))
     SMTP_USER: str | None = os.getenv("SMTP_USER") or None
     SMTP_PASSWORD: str | None = os.getenv("SMTP_PASSWORD") or None
     FROM_EMAIL: str = os.getenv("FROM_EMAIL", "si2psicologiaproy@gmail.com")

@@ -10,6 +10,7 @@ IMPORTANTE:
   - Las URLs del frontend se construyen dinámicamente según el entorno.
 """
 
+import os
 import smtplib
 import logging
 from email.message import EmailMessage

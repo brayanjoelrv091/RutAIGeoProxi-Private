@@ -79,7 +79,7 @@ class Settings:
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
     SMTP_USER: str | None = os.getenv("SMTP_USER") or None
     SMTP_PASSWORD: str | None = os.getenv("SMTP_PASSWORD") or None
-    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "no-reply@rutaigeoproxi.com")
+    FROM_EMAIL: str = os.getenv("FROM_EMAIL", "si2psicologiaproy@gmail.com")
 
     # ── Stripe (Pagos) ─────────────────────────────────────────────────
     STRIPE_PUBLIC_KEY: str | None = os.getenv("STRIPE_PUBLIC_KEY")

@@ -1,17 +1,95 @@
+"""
+Módulo de envío de correos electrónicos vía Brevo SMTP.
+
+Funciones:
+  - send_reset_email: Correo de recuperación de contraseña.
+  - send_tenant_welcome_email: Credenciales temporales para nuevos tenants (CU-29).
+
+IMPORTANTE:
+  - FROM_EMAIL debe ser un remitente verificado en Brevo (tu cuenta registrada).
+  - Las URLs del frontend se construyen dinámicamente según el entorno.
+"""
+
 import smtplib
+import logging
 from email.message import EmailMessage
 from app.shared.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def _get_frontend_base_url() -> str:
+    """
+    Determina la URL base del frontend según el entorno.
+    En desarrollo (DEBUG_RESET_TOKEN=true) usa localhost.
+    En producción usa la URL de Render/Vercel.
+    """
+    if settings.DEBUG_RESET_TOKEN:
+        return "http://localhost:4200"
+    # Intentar leer de variable de entorno, fallback a Vercel
+    import os
+    return os.getenv("FRONTEND_URL", "https://rutaigeoproxi.vercel.app")
+
+
+def _send_email(msg: EmailMessage, context: str = "correo") -> None:
+    """
+    Envía un EmailMessage vía Brevo SMTP con logging profesional.
+    Propaga excepciones para que BackgroundTasks las registre.
+    """
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        logger.warning(
+            "SMTP no configurado (SMTP_USER o SMTP_PASSWORD vacíos). "
+            "No se enviará %s.", context
+        )
+        return
+
+    logger.info(
+        "Enviando %s | FROM=%s | TO=%s | SMTP=%s:%s",
+        context,
+        settings.FROM_EMAIL,
+        msg['To'],
+        settings.SMTP_SERVER,
+        settings.SMTP_PORT,
+    )
+
+    try:
+        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=30) as server:
+            server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.send_message(msg)
+        logger.info("✅ %s enviado exitosamente a %s", context, msg['To'])
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(
+            "❌ Error de autenticación SMTP. Verifica SMTP_USER y SMTP_PASSWORD. "
+            "Detalle: %s", e
+        )
+        raise
+    except smtplib.SMTPSenderRefused as e:
+        logger.error(
+            "❌ Remitente rechazado: FROM_EMAIL='%s' no está verificado en Brevo. "
+            "Debes usar el email con el que registraste tu cuenta Brevo. "
+            "Detalle: %s", settings.FROM_EMAIL, e
+        )
+        raise
+    except smtplib.SMTPRecipientsRefused as e:
+        logger.error(
+            "❌ Destinatario rechazado: TO='%s'. Detalle: %s", msg['To'], e
+        )
+        raise
+    except smtplib.SMTPException as e:
+        logger.error("❌ Error SMTP al enviar %s: %s", context, e)
+        raise
+    except Exception as e:
+        logger.error("❌ Error inesperado al enviar %s: %s", context, e)
+        raise
+
 
 def send_reset_email(to_email: str, token: str):
     """
     Envía el correo de recuperación de contraseña vía Brevo (SMTP).
     """
-    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        print("SMTP no configurado. No se enviará correo.")
-        return
-
-    # Usamos la URL local para el desarrollo (Angular)
-    reset_url = f"http://localhost:4200/reset-password?token={token}"
+    frontend_url = _get_frontend_base_url()
+    reset_url = f"{frontend_url}/reset-password?token={token}"
 
     msg = EmailMessage()
     msg['Subject'] = "Recuperación de Contraseña - RutAIGeoProxi"
@@ -85,24 +163,16 @@ def send_reset_email(to_email: str, token: str):
     </html>
     """
     msg.set_content(html_content, subtype='html')
+    _send_email(msg, context="correo de recuperación de contraseña")
 
-    try:
-        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
-            server.starttls()
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-    except Exception as e:
-        print(f"Error al enviar el correo: {e}")
 
 def send_tenant_welcome_email(to_email: str, tenant_name: str, temp_password: str):
     """
     Envía el correo de bienvenida al nuevo administrador del tenant (CU-29).
+    Incluye las credenciales temporales generadas automáticamente.
     """
-    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-        print("SMTP no configurado. No se enviará correo.")
-        return
-
-    login_url = "http://localhost:4200/login"
+    frontend_url = _get_frontend_base_url()
+    login_url = f"{frontend_url}/login"
 
     msg = EmailMessage()
     msg['Subject'] = f"¡Bienvenido a RutAIGeoProxi! Accesos para {tenant_name}"
@@ -176,11 +246,4 @@ def send_tenant_welcome_email(to_email: str, tenant_name: str, temp_password: st
     </html>
     """
     msg.set_content(html_content, subtype='html')
-
-    try:
-        with smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT) as server:
-            server.starttls()
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.send_message(msg)
-    except Exception as e:
-        print(f"Error al enviar el correo de bienvenida: {e}")
+    _send_email(msg, context=f"correo de bienvenida tenant '{tenant_name}'")

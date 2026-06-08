@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.modules.p2_incidentes.models import Incidente, ClasificacionIncidente
 from app.modules.p4_asignacion.models import Asignacion
 from app.modules.p9_analitica.models import Cotizacion, CotizacionItem
-from app.modules.p9_analitica.schemas import DashboardKPIs, TiempoEstimadoOut
+from app.modules.p9_analitica.schemas import DashboardKPIs, TiempoEstimadoOut, CotizacionCreateManual
 from app.modules.p8_realtime.models import EventoEstado
 from app.modules.p1_usuarios.models import Usuario
 

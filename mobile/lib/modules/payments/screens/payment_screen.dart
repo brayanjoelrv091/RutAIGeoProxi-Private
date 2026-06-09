@@ -1,12 +1,10 @@
-/// CU18 — Pasarela de Pago en línea (simulada).
-///
-/// POST /payments/process
-/// Requiere: incidente_id, monto, moneda, metodo_pago
-library;
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
-
-import '../../../core/api_client.dart';
+import 'package:http/http.dart' as http;
+import 'package:rutaigeoproxi_mobile/config.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:rutaigeoproxi_mobile/session.dart';
+import 'package:rutaigeoproxi_mobile/backend.dart';
 
 class PaymentScreen extends StatefulWidget {
   final int incidentId;
@@ -25,40 +23,83 @@ class PaymentScreen extends StatefulWidget {
 class _PaymentScreenState extends State<PaymentScreen> {
   bool _isProcessing = false;
   bool _isSuccess = false;
-  String? _transaccionId;
-  String? _errorMsg;
 
-  String _metodoPago = 'tarjeta';
-  String _moneda = 'USD';
+  bool _esperandoEfectivo = false;
+  String? _qrData;
 
-  static const _metodos = ['tarjeta', 'transferencia', 'efectivo'];
-  static const _monedas = ['USD', 'CLP', 'EUR'];
-
-  Future<void> _processPayment() async {
-    setState(() {
-      _isProcessing = true;
-      _errorMsg = null;
-    });
-
+  Future<void> _processStripe() async {
+    setState(() => _isProcessing = true);
     try {
-      final result = await ApiClient.post<Map<String, dynamic>>(
-        '/payments/process',
-        body: {
-          'incidente_id': widget.incidentId,
-          'monto': widget.amount,
-          'moneda': _moneda,
-          'metodo_pago': _metodoPago,
+      final token = await Session.getToken();
+      final response = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/payments/checkout-session/${widget.incidentId}'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
         },
-        fromJson: (j) => j as Map<String, dynamic>,
       );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final url = data['checkout_url'];
+        if (url != null && url.isNotEmpty) {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            if (mounted) setState(() { _isProcessing = false; _isSuccess = true; });
+            return;
+          } else {
+            throw Exception('No se puede abrir el navegador seguro.');
+          }
+        }
+      }
+      throw Exception('Error al conectar con Stripe');
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _processCash() async {
+    setState(() => _isProcessing = true);
+    final success = await Backend.requestCashPayment(widget.incidentId);
+    if (success && mounted) {
       setState(() {
-        _isSuccess = true;
-        _transaccionId = result['transaccion_id'] as String?;
+        _isProcessing = false;
+        _esperandoEfectivo = true;
       });
-    } on ApiException catch (e) {
-      setState(() => _errorMsg = e.message);
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Taller notificado. Págale en efectivo y espera su confirmación.')));
+    } else {
+      setState(() => _isProcessing = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al procesar pago en efectivo')));
+    }
+  }
+
+  Future<void> _processQR() async {
+    setState(() => _isProcessing = true);
+    final data = await Backend.requestQrPayment(widget.incidentId);
+    if (data != null && data['qr_data'] != null && mounted) {
+      setState(() {
+        _isProcessing = false;
+        _qrData = data['qr_data'];
+      });
+    } else {
+      setState(() => _isProcessing = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error al generar QR')));
+    }
+  }
+
+  Future<void> _simulateQrSuccess() async {
+    setState(() => _isProcessing = true);
+    final success = await Backend.confirmQrPayment(widget.incidentId);
+    if (success && mounted) {
+      setState(() {
+        _isProcessing = false;
+        _isSuccess = true;
+        _qrData = null;
+      });
+    } else {
+      setState(() => _isProcessing = false);
     }
   }
 
@@ -67,227 +108,181 @@ class _PaymentScreenState extends State<PaymentScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E1A),
       appBar: AppBar(
-        title: const Text('Pasarela de Pago'),
+        title: const Text('Métodos de Pago'),
         backgroundColor: const Color(0xFF111629),
-        foregroundColor: const Color(0xFF00F2FF),
+        elevation: 0,
       ),
-      body: Center(
-        child: _isSuccess ? _buildSuccess() : _buildForm(),
+      body: _isSuccess 
+          ? _buildSuccess() 
+          : _esperandoEfectivo 
+              ? _buildWaitingCash() 
+              : _qrData != null 
+                  ? _buildQrView() 
+                  : _buildPaymentMethods(),
+    );
+  }
+
+  Widget _buildWaitingCash() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: Colors.orange),
+            const SizedBox(height: 24),
+            const Text('Esperando confirmación del taller...', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            const SizedBox(height: 12),
+            const Text('Entrega el efectivo al técnico. Una vez que lo reciba, confirmará en su aplicación y se completará el servicio.', style: TextStyle(color: Colors.white70, fontSize: 16), textAlign: TextAlign.center),
+            const SizedBox(height: 40),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('CERRAR', style: TextStyle(color: Color(0xFF00F2FF), fontSize: 16)),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildForm() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 20),
-          // Ícono y monto
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF00F2FF).withValues(alpha: 0.08),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFF00F2FF).withValues(alpha: 0.3),
-                  width: 2,
-                ),
-              ),
-              child: const Icon(
-                Icons.account_balance_wallet,
-                size: 52,
-                color: Color(0xFF00F2FF),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Center(
-            child: Text(
-              '\$${widget.amount.toStringAsFixed(2)}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 36,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Center(
-            child: Text(
-              'Incidente #${widget.incidentId}',
-              style: const TextStyle(color: Colors.white38, fontSize: 14),
-            ),
-          ),
-          const SizedBox(height: 30),
-
-          // Selector de moneda
-          _buildSectionLabel('Moneda'),
-          const SizedBox(height: 8),
-          Row(
-            children: _monedas.map((m) => Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(m),
-                selected: _moneda == m,
-                onSelected: (_) => setState(() => _moneda = m),
-                selectedColor: const Color(0xFF00F2FF),
-                backgroundColor: const Color(0xFF111629),
-                labelStyle: TextStyle(
-                  color: _moneda == m ? Colors.black : Colors.white70,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            )).toList(),
-          ),
-          const SizedBox(height: 20),
-
-          // Selector de método de pago
-          _buildSectionLabel('Método de Pago'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: _metodos.map((m) => ChoiceChip(
-              label: Text(m),
-              selected: _metodoPago == m,
-              onSelected: (_) => setState(() => _metodoPago = m),
-              selectedColor: const Color(0xFF00F2FF),
-              backgroundColor: const Color(0xFF111629),
-              labelStyle: TextStyle(
-                color: _metodoPago == m ? Colors.black : Colors.white70,
-              ),
-            )).toList(),
-          ),
-
-          if (_errorMsg != null) ...[
-            const SizedBox(height: 16),
+  Widget _buildQrView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Escanea para Pagar', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 24),
             Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF6B6B).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFF6B6B).withValues(alpha: 0.4)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Color(0xFFFF6B6B), size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _errorMsg!,
-                      style: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+              child: Icon(Icons.qr_code_2, size: 200, color: Colors.black),
             ),
-          ],
-
-          const SizedBox(height: 30),
-          SizedBox(
-            height: 54,
-            child: ElevatedButton(
-              onPressed: _isProcessing ? null : _processPayment,
+            const SizedBox(height: 12),
+            Text(_qrData!, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+            const SizedBox(height: 40),
+            ElevatedButton(
+              onPressed: _isProcessing ? null : _simulateQrSuccess,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00F2FF),
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                minimumSize: const Size(double.infinity, 50),
               ),
-              child: _isProcessing
-                  ? const CircularProgressIndicator(color: Colors.black, strokeWidth: 2)
-                  : const Text(
-                      'PAGAR AHORA',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
+              child: _isProcessing ? const CircularProgressIndicator(color: Colors.black) : const Text('Simular Pago QR Exitoso'),
             ),
+            TextButton(
+              onPressed: () => setState(() => _qrData = null),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.redAccent)),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethods() {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111629),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF00F2FF).withOpacity(0.3)),
           ),
-        ],
+          child: Column(
+            children: [
+              const Text('TOTAL A PAGAR', style: TextStyle(color: Colors.white54, fontSize: 14)),
+              const SizedBox(height: 8),
+              Text(
+                'Bs. ${widget.amount.toStringAsFixed(2)}',
+                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 40),
+        const Text('Selecciona tu método de pago', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 20),
+        
+        // EFECTIVO
+        _buildPaymentOption(
+          icon: Icons.money,
+          title: 'Efectivo',
+          subtitle: 'Paga directamente al técnico',
+          onTap: _processCash,
+        ),
+        const SizedBox(height: 16),
+        
+        // QR
+        _buildPaymentOption(
+          icon: Icons.qr_code,
+          title: 'Pago con QR',
+          subtitle: 'Transferencia bancaria rápida',
+          onTap: _processQR,
+        ),
+        const SizedBox(height: 16),
+
+        // TARJETA
+        _buildPaymentOption(
+          icon: Icons.credit_card,
+          title: 'Tarjeta de Crédito / Débito',
+          subtitle: 'Pago seguro vía Stripe',
+          onTap: _processStripe,
+          isPrimary: true,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentOption({required IconData icon, required String title, required String subtitle, required VoidCallback onTap, bool isPrimary = false}) {
+    return InkWell(
+      onTap: _isProcessing ? null : onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isPrimary ? const Color(0xFF00F2FF).withOpacity(0.1) : const Color(0xFF1A2235),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isPrimary ? const Color(0xFF00F2FF) : Colors.transparent),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isPrimary ? const Color(0xFF00F2FF) : Colors.white70, size: 30),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSuccess() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              color: Color(0xFF00C853),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.check, size: 60, color: Colors.white),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'PAGO EXITOSO',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Tu servicio ha sido liquidado.',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
-          ),
-          if (_transaccionId != null) ...[
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111629),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.receipt_long, color: Color(0xFF00F2FF), size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    'TX: $_transaccionId',
-                    style: const TextStyle(
-                      color: Color(0xFF00F2FF),
-                      fontFamily: 'monospace',
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 40),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('VOLVER'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF00F2FF),
-              side: const BorderSide(color: Color(0xFF00F2FF)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionLabel(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: Colors.white54,
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
-      ),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const Icon(Icons.check_circle, size: 120, color: Color(0xFF00E676)),
+        const SizedBox(height: 24),
+        const Text('¡PAGO COMPLETADO!', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        const Text('Su pago ha sido procesado exitosamente.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 16)),
+        const SizedBox(height: 40),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('VOLVER AL INICIO', style: TextStyle(color: Color(0xFF00F2FF), fontSize: 18)),
+        ),
+      ],
     );
   }
 }

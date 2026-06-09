@@ -2,7 +2,7 @@
 P5 — Rutas de Pagos y Notificaciones (CU16, CU17, CU18).
 """
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, HTTPException, status
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 

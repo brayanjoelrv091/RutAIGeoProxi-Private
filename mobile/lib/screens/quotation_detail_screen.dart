@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:rutaigeoproxi_mobile/config.dart';
 import '../session.dart';
-import 'payment_screen.dart';
+import '../modules/payments/screens/payment_screen.dart';
 
 class QuotationDetailScreen extends StatefulWidget {
   final int incidentId;

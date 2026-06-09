@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:rutaigeoproxi_mobile/config.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../session.dart';
+import '../backend.dart';
 
 class PaymentScreen extends StatefulWidget {
   final int incidentId;
@@ -61,7 +62,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Future<void> _processCash() async {
     setState(() => _isProcessing = true);
-    import '../backend.dart';
     final success = await Backend.requestCashPayment(widget.incidentId);
     if (success && mounted) {
       setState(() {
@@ -77,7 +77,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Future<void> _processQR() async {
     setState(() => _isProcessing = true);
-    import '../backend.dart';
     final data = await Backend.requestQrPayment(widget.incidentId);
     if (data != null && data['qr_data'] != null && mounted) {
       setState(() {
@@ -92,7 +91,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   Future<void> _simulateQrSuccess() async {
     setState(() => _isProcessing = true);
-    import '../backend.dart';
     final success = await Backend.confirmQrPayment(widget.incidentId);
     if (success && mounted) {
       setState(() {

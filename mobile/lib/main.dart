@@ -39,6 +39,8 @@ import 'modules/vehicles/screens/my_vehicles_screen.dart';
 import 'modules/workshops/screens/workshop_list_screen.dart';
 import 'modules/auth/screens/profile_screen.dart';
 import 'screens/report_incident_screen.dart';
+import 'screens/workshop_explorer_screen.dart';
+import 'screens/quotation_detail_screen.dart';
 import 'modules/offline/sync_manager.dart';
 
 @pragma('vm:entry-point')
@@ -110,6 +112,7 @@ class _RutAIGeoProxiAppState extends State<RutAIGeoProxiApp> {
         '/workshops': (_) => const WorkshopListScreen(),
         '/notifications': (_) => const NotificationsScreen(),
         '/profile': (_) => const ProfileScreen(),
+        '/workshops-map': (_) => const WorkshopExplorerScreen(),
       },
       // Rutas con parámetros (onGenerateRoute)
       onGenerateRoute: (settings) {
@@ -128,6 +131,14 @@ class _RutAIGeoProxiAppState extends State<RutAIGeoProxiApp> {
             builder: (_) => PaymentScreen(
               incidentId: args?['incidentId'] as int? ?? 0,
               amount: (args?['amount'] as num?)?.toDouble() ?? 0.0,
+            ),
+          );
+        }
+        if (settings.name == '/quotation') {
+          final args = settings.arguments as Map<String, dynamic>?;
+          return MaterialPageRoute(
+            builder: (_) => QuotationDetailScreen(
+              incidentId: args?['incidentId'] as int? ?? 1,
             ),
           );
         }
@@ -468,6 +479,22 @@ class _HomeWrapperState extends State<_HomeWrapper> {
               sub: 'CU7 · GPS + Descripción',
               color: const Color(0xFFFF6B6B),
               onTap: () => Navigator.pushNamed(context, '/report'),
+            ),
+            const SizedBox(height: 10),
+            _HomeButton(
+              icon: Icons.map,
+              label: 'Mapa de Talleres',
+              sub: 'CU31 · Explorar en tiempo real',
+              color: const Color(0xFF00F2FF),
+              onTap: () => Navigator.pushNamed(context, '/workshops-map'),
+            ),
+            const SizedBox(height: 10),
+            _HomeButton(
+              icon: Icons.receipt_long,
+              label: 'Ver Cotización',
+              sub: 'CU30/32 · Tiempo y Costo',
+              color: const Color(0xFFAB47BC),
+              onTap: () => Navigator.pushNamed(context, '/quotation', arguments: {'incidentId': 1}),
             ),
             const SizedBox(height: 10),
             _HomeButton(

@@ -33,41 +33,50 @@ class _WorkshopExplorerScreenState extends State<WorkshopExplorerScreen> {
       // Simulando llamada a un servicio que trae los talleres cercanos
       // El backend no tiene un endpoint explícito para nearby todavía, usaremos los favoritos o un mock local si falla
       try {
-        final data = await WorkshopService.listMyFavorites();
+        // Fetch all workshops from backend to display on the map
+        final data = await WorkshopService.listAllWorkshops();
         if (data.isNotEmpty) {
            _workshops = data;
         }
-      } catch (_) {}
+      } catch (e) {
+        print('Error fetching workshops: $e');
+      }
       
       if (_workshops.isEmpty) {
         // Fallback para visualización de la UI si no hay favoritos
         _workshops = [
           Workshop(
-            id: 1, 
-            nombre: 'Taller SCZ Centro', 
-            direccion: 'Av. Principal 0', 
-            latitud: -17.7833, 
-            longitud: -63.1821, 
-            calificacionPromedio: 4.8, 
-            especialidades: {'principal': 'general'}
+            id: 1,
+            usuarioPropietarioId: 1,
+            nombre: 'SuperMecánica SCZ',
+            direccion: '3er Anillo Interno, Santa Cruz',
+            latitud: -17.7813,
+            longitud: -63.1801,
+            calificacionPromedio: 4.8,
+            estaActivo: true,
+            creadoEn: '',
           ),
           Workshop(
-            id: 2, 
-            nombre: 'MotorTech Norte', 
-            direccion: 'Av. Principal 100', 
-            latitud: -17.7600, 
-            longitud: -63.1700, 
-            calificacionPromedio: 4.5, 
-            especialidades: {'principal': 'mecanico'}
+            id: 2,
+            usuarioPropietarioId: 2,
+            nombre: 'AutoFix Express',
+            direccion: 'Av. Banzer Km 2, Santa Cruz',
+            latitud: -17.7780,
+            longitud: -63.1750,
+            calificacionPromedio: 4.5,
+            estaActivo: true,
+            creadoEn: '',
           ),
           Workshop(
-            id: 3, 
-            nombre: 'ElectricCar Sur', 
-            direccion: 'Av. Principal 200', 
-            latitud: -17.8100, 
-            longitud: -63.1800, 
-            calificacionPromedio: 4.9, 
-            especialidades: {'principal': 'electrico'}
+            id: 3,
+            usuarioPropietarioId: 3,
+            nombre: 'Taller El Tuerca',
+            direccion: 'Plan 3000, Santa Cruz',
+            latitud: -17.8100,
+            longitud: -63.1500,
+            calificacionPromedio: 4.0,
+            estaActivo: true,
+            creadoEn: '',
           ),
         ];
       }
@@ -220,17 +229,21 @@ class _WorkshopExplorerScreenState extends State<WorkshopExplorerScreen> {
                 Expanded(child: Text(w.direccion, style: const TextStyle(color: Colors.white70, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
               ],
             ),
-            if (w.especialidades != null && w.especialidades!['principal'] != null) ...[
+            if (w.especialidades != null && w.especialidades!.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.handyman, color: Colors.white54, size: 16),
-                  const SizedBox(width: 4),
-                  Text('Especialidad: ${w.especialidades!['principal'].toString().toUpperCase()}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(8)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.build, size: 14, color: Colors.white70),
+                    const SizedBox(width: 4),
+                    Text('Especialidad: ${w.especialidades!.first.toUpperCase()}', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                  ],
+                ),
               ),
-            ],
-            const SizedBox(height: 16),
+            ],const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(

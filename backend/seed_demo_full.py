@@ -223,6 +223,30 @@ def seed():
         )
         db.commit()
 
+        # ── SEGUNDO TENANT (Aislamiento) ──────────────────────────────
+        print("\n[TENANT 2] Creando Segundo Tenant para prueba de Aislamiento:")
+        tenant2 = get_or_create_tenant(db, "Red de Talleres Norte", "red-talleres-norte", "profesional")
+
+        admin2 = get_or_create_user(db, "admin2@ruta.com", "Admin Norte", "admin", "Password123", tenant_id=tenant2.id)
+        get_or_create_membership(db, admin2.id, tenant2.id, "owner")
+        
+        cliente3 = get_or_create_user(db, "cliente3@ruta.com", "Luis Soto", "cliente", "Password123", tenant_id=tenant2.id)
+        taller_u3 = get_or_create_user(db, "tallernorte@ruta.com", "Taller Express Norte", "taller", "Password123", tenant_id=tenant2.id)
+        db.commit()
+
+        taller3 = get_or_create_workshop(
+            db, "Taller Express Norte", taller_u3.id,
+            direccion="Av. Perú 100, Recoleta",
+            latitud=-33.4150, longitud=-70.6400,
+            telefono="+56911112222",
+            email="tallernorte@ruta.com",
+            especialidades=["mecanico", "emergencia_vial"],
+            esta_activo=True,
+            estado_registro="completado",
+            tenant_id=tenant2.id,
+        )
+        db.commit()
+
         # ── Incidentes ────────────────────────────────────────────────
         print("\n[WARN]  Incidentes:")
 

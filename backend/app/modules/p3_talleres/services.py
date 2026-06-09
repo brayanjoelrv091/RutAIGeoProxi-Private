@@ -55,8 +55,44 @@ class WorkshopService:
 
         tenant_id = user.tenant_id if user else None
 
+        # Crear cuenta de usuario para el taller
+        if payload.email and payload.password:
+            existente = db.query(Usuario).filter(Usuario.email == payload.email).first()
+            if existente:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El correo ya está registrado por otro usuario o taller",
+                )
+            
+            from app.shared.security import get_password_hash
+            taller_user = Usuario(
+                nombre=payload.nombre,
+                email=payload.email,
+                hashed_password=get_password_hash(payload.password),
+                rol="taller",
+                tenant_id=tenant_id,
+                esta_activo=True
+            )
+            db.add(taller_user)
+            db.commit()
+            db.refresh(taller_user)
+            
+            if tenant_id:
+                from app.modules.p7_seguridad_multitenant.models import TenantMembership
+                membership = TenantMembership(
+                    usuario_id=taller_user.id,
+                    tenant_id=tenant_id,
+                    rol_en_tenant="miembro"
+                )
+                db.add(membership)
+                db.commit()
+                
+            propietario_id = taller_user.id
+        else:
+            propietario_id = user_id
+
         taller = Taller(
-            usuario_propietario_id=user_id,
+            usuario_propietario_id=propietario_id,
             tenant_id=tenant_id,
             nombre=payload.nombre,
             direccion=payload.direccion,

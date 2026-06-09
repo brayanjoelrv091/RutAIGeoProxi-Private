@@ -18,6 +18,7 @@ class WorkshopCreate(BaseModel):
     longitud: float = Field(ge=-180, le=180)
     telefono: str | None = Field(default=None, max_length=50)
     email: EmailStr | None = None
+    password: str = Field(min_length=8, description="Contraseña para la cuenta del taller")
     especialidades: list[str] | None = None
 
 

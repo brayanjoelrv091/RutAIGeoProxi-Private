@@ -184,6 +184,21 @@ class IncidentService:
             accion=f"Reporte de incidente #{incidente.id} ({incidente.categoria})"
         )
 
+        # Enviar Notificación Push a todos los talleres del tenant
+        if tenant_id and background_tasks:
+            from app.modules.p3_talleres.models import Taller
+            from app.modules.p5_pagos.services import NotificationService
+            talleres_tenant = db.query(Taller).filter(Taller.tenant_id == tenant_id, Taller.esta_activo == True).all()
+            
+            for t in talleres_tenant:
+                background_tasks.add_task(
+                    NotificationService.send_push_notification,
+                    db=db,
+                    user_id=t.usuario_propietario_id,
+                    titulo="¡Nuevo Incidente Reportado!",
+                    mensaje=f"Un cliente necesita asistencia: {incidente.titulo} ({incidente.severidad})"
+                )
+
         # Limpiar archivos temporales
         for p in image_local_paths:
             try:

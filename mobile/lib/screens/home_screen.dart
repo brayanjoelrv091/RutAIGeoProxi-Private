@@ -4,6 +4,7 @@ import '../backend.dart';
 import 'map_explorer_screen.dart';
 import 'workshop_explorer_screen.dart';
 import 'quotation_detail_screen.dart';
+import 'tenant_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.onLogout});
@@ -116,6 +117,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     label: const Text('Cambiar Contraseña', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00F2FF)),
                   ),
+                  if (_me!['role'] == 'admin') ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const TenantDashboardScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.business, color: Colors.black),
+                      label: const Text('⚙️ Gestión de Empresa (SaaS)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00F2FF),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: () {

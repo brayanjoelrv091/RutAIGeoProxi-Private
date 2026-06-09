@@ -57,6 +57,7 @@ class WorkshopService {
     required double longitud,
     String? telefono,
     String? email,
+    required String password,
     List<String>? especialidades,
   }) async {
     return ApiClient.post<Workshop>(
@@ -66,6 +67,7 @@ class WorkshopService {
         'direccion': direccion,
         'latitud': latitud,
         'longitud': longitud,
+        'password': password,
         ...?telefono == null ? null : {'telefono': telefono},
         ...?email == null ? null : {'email': email},
         ...?especialidades == null ? null : {'especialidades': especialidades},

@@ -499,6 +499,59 @@ class TenantService:
     def list_members(db: Session, tenant_id: int) -> list[TenantMembership]:
         return db.query(TenantMembership).filter(TenantMembership.tenant_id == tenant_id).all()
 
+    @staticmethod
+    def get_tenant_dashboard(db: Session, tenant_id: int) -> dict:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        if not tenant:
+            raise HTTPException(status_code=404, detail="Tenant no encontrado")
+
+        from app.modules.p3_talleres.models import Taller
+        talleres_count = db.query(Taller).filter(Taller.tenant_id == tenant_id).count()
+        usuarios_count = db.query(TenantMembership).filter(TenantMembership.tenant_id == tenant_id).count()
+
+        plan = tenant.plan.lower()
+        limite_talleres = 1 if plan == "gratis" else (3 if plan == "profesional" else "ilimitado")
+        limite_usuarios = 3 if plan == "gratis" else (10 if plan == "profesional" else "ilimitado")
+
+        return {
+            "tenant_id": tenant.id,
+            "nombre": tenant.nombre,
+            "plan": tenant.plan,
+            "estado_pago": tenant.estado_pago,
+            "fecha_fin_plan": tenant.fecha_fin_plan,
+            "limite_talleres": limite_talleres,
+            "talleres_registrados": talleres_count,
+            "limite_usuarios": limite_usuarios,
+            "usuarios_registrados": usuarios_count,
+        }
+
+    @staticmethod
+    def list_tenant_workshops(db: Session, tenant_id: int):
+        from app.modules.p3_talleres.models import Taller
+        from app.modules.p3_talleres.services import WorkshopService
+        talleres = db.query(Taller).filter(Taller.tenant_id == tenant_id).all()
+        for t in talleres:
+            t.en_linea = WorkshopService._is_online(t)
+        return talleres
+
+    @staticmethod
+    def list_tenant_members(db: Session, tenant_id: int):
+        memberships = db.query(TenantMembership).filter(TenantMembership.tenant_id == tenant_id).all()
+        result = []
+        for m in memberships:
+            usuario = db.query(Usuario).filter(Usuario.id == m.usuario_id).first()
+            if usuario:
+                result.append({
+                    "id": usuario.id,
+                    "nombre": usuario.nombre,
+                    "email": usuario.email,
+                    "rol": usuario.rol,
+                    "rol_en_tenant": m.rol_en_tenant,
+                    "esta_activo": usuario.esta_activo,
+                    "creado_en": usuario.creado_en,
+                })
+        return result
+
 
 class TenantFilterService:
     """Lógica para aplicar row-level security / filtros automáticos."""

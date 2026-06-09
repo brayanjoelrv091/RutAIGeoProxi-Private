@@ -23,6 +23,7 @@ class _RegisterWorkshopScreenState extends State<RegisterWorkshopScreen> {
   final _lngCtrl = TextEditingController();
   final _telefonoCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
   final _especialidadCtrl = TextEditingController();
 
   final List<String> _especialidades = [];
@@ -36,6 +37,7 @@ class _RegisterWorkshopScreenState extends State<RegisterWorkshopScreen> {
     _lngCtrl.dispose();
     _telefonoCtrl.dispose();
     _emailCtrl.dispose();
+    _passwordCtrl.dispose();
     _especialidadCtrl.dispose();
     super.dispose();
   }
@@ -59,6 +61,7 @@ class _RegisterWorkshopScreenState extends State<RegisterWorkshopScreen> {
         longitud: double.parse(_lngCtrl.text.trim()),
         telefono: _telefonoCtrl.text.trim().isNotEmpty ? _telefonoCtrl.text.trim() : null,
         email: _emailCtrl.text.trim().isNotEmpty ? _emailCtrl.text.trim() : null,
+        password: _passwordCtrl.text,
         especialidades: _especialidades.isNotEmpty ? List.from(_especialidades) : null,
       );
       if (mounted) {
@@ -141,7 +144,9 @@ class _RegisterWorkshopScreenState extends State<RegisterWorkshopScreen> {
             const SizedBox(height: 12),
             _buildField(_telefonoCtrl, 'Teléfono', hint: '+56 9 1234 5678'),
             const SizedBox(height: 12),
-            _buildField(_emailCtrl, 'Email', hint: 'taller@ejemplo.com'),
+            _buildField(_emailCtrl, 'Email', hint: 'taller@ejemplo.com', validator: (v) => v!.isEmpty ? 'Requerido para la cuenta' : null),
+            const SizedBox(height: 12),
+            _buildField(_passwordCtrl, 'Contraseña *', hint: 'Mínimo 8 caracteres', obscure: true, validator: (v) => v == null || v.length < 8 ? 'Mínimo 8 caracteres' : null),
             const SizedBox(height: 16),
             const _SectionHeader('Especialidades'),
             const SizedBox(height: 12),
@@ -217,11 +222,13 @@ class _RegisterWorkshopScreenState extends State<RegisterWorkshopScreen> {
     String label, {
     String? hint,
     bool numeric = false,
+    bool obscure = false,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: ctrl,
       validator: validator,
+      obscureText: obscure,
       keyboardType: numeric ? TextInputType.number : TextInputType.text,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(

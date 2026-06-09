@@ -172,3 +172,43 @@ def list_members(
     _current: Usuario = Depends(require_roles("admin")),
 ):
     return TenantService.list_members(db, tenant_id)
+
+from app.modules.p7_seguridad_multitenant.schemas import TenantDashboardOut, TenantMemberOut
+from app.modules.p3_talleres.schemas import WorkshopOut
+
+@router.get("/me/dashboard", response_model=TenantDashboardOut, summary="Dashboard del Tenant actual")
+def get_my_dashboard(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("admin")),
+):
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=400, detail="El usuario no tiene una red de talleres asignada.")
+    return TenantService.get_tenant_dashboard(db, current_user.tenant_id)
+
+@router.get("/me/workshops", response_model=list[WorkshopOut], summary="Listar talleres del Tenant actual")
+def list_my_workshops(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("admin")),
+):
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=400, detail="El usuario no tiene una red de talleres asignada.")
+    return TenantService.list_tenant_workshops(db, current_user.tenant_id)
+
+@router.get("/me/members", response_model=list[TenantMemberOut], summary="Listar miembros del Tenant actual")
+def list_my_members(
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("admin")),
+):
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=400, detail="El usuario no tiene una red de talleres asignada.")
+    return TenantService.list_tenant_members(db, current_user.tenant_id)
+
+@router.delete("/me/members/{usuario_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar miembro del Tenant actual")
+def remove_my_member(
+    usuario_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_roles("admin")),
+):
+    if not current_user.tenant_id:
+        raise HTTPException(status_code=400, detail="El usuario no tiene una red de talleres asignada.")
+    TenantService.remove_member(db, current_user.tenant_id, usuario_id)

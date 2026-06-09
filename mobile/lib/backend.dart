@@ -292,4 +292,28 @@ class Backend {
     } catch (_) {}
     return 'Error ${response.statusCode}';
   }
+
+  static Future<Map<String, dynamic>?> getTenantDashboard() async {
+    try {
+      final response = await http.get(_uri('/tenants/me/dashboard'), headers: await _headers());
+      if (response.statusCode == 200) return jsonDecode(response.body);
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<List<dynamic>> getTenantWorkshops() async {
+    try {
+      final response = await http.get(_uri('/tenants/me/workshops'), headers: await _headers());
+      if (response.statusCode == 200) return jsonDecode(response.body);
+    } catch (_) {}
+    return [];
+  }
+
+  static Future<List<dynamic>> getTenantMembers() async {
+    try {
+      final response = await http.get(_uri('/tenants/me/members'), headers: await _headers());
+      if (response.statusCode == 200) return jsonDecode(response.body);
+    } catch (_) {}
+    return [];
+  }
 }

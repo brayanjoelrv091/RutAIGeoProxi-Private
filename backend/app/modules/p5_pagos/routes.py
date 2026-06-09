@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, HTTPExce
 from sqlalchemy.orm import Session
 from typing import List
 
-from app.shared.deps import get_current_user, get_db, get_token_credentials
+from app.shared.deps import get_current_user, get_db, get_token_credentials, require_operational_roles
 from app.shared.security import jwt_payload_safe
 from app.modules.p1_usuarios.models import Usuario
 from app.modules.p5_pagos.schemas import PagoCreate, PagoResponse, NotificacionResponse

@@ -48,15 +48,39 @@ from app.modules.p3_talleres.models import (  # noqa: E402
 )
 from app.modules.p4_asignacion.models import Asignacion  # noqa: E402
 from app.modules.p5_pagos.models import Pago, Notificacion  # noqa: E402
-
+from app.modules.p7_seguridad_multitenant.models import Tenant, TenantMembership  # noqa: E402
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
-def get_or_create_user(db: Session, email: str, nombre: str, rol: str, password: str) -> Usuario:
+def get_or_create_tenant(db: Session, nombre: str, slug: str, plan: str = "profesional") -> Tenant:
+    t = db.query(Tenant).filter(Tenant.slug == slug).first()
+    if not t:
+        t = Tenant(nombre=nombre, slug=slug, plan=plan, esta_activo=True)
+        db.add(t)
+        db.flush()
+        print(f"  [OK] Tenant creado: {nombre}")
+    return t
+
+
+def get_or_create_membership(db: Session, usuario_id: int, tenant_id: int, rol_en_tenant: str = "owner") -> TenantMembership:
+    m = db.query(TenantMembership).filter(
+        TenantMembership.usuario_id == usuario_id,
+        TenantMembership.tenant_id == tenant_id
+    ).first()
+    if not m:
+        m = TenantMembership(usuario_id=usuario_id, tenant_id=tenant_id, rol_en_tenant=rol_en_tenant)
+        db.add(m)
+        db.flush()
+        print(f"  [OK] Membresía creada para usuario {usuario_id} en tenant {tenant_id}")
+    return m
+
+
+def get_or_create_user(db: Session, email: str, nombre: str, rol: str, password: str, tenant_id: int = None) -> Usuario:
     u = db.query(Usuario).filter(Usuario.email == email).first()
     if not u:
         u = Usuario(
+            tenant_id=tenant_id,
             nombre=nombre,
             email=email,
             hashed_password=get_password_hash(password),
@@ -68,6 +92,9 @@ def get_or_create_user(db: Session, email: str, nombre: str, rol: str, password:
         db.flush()
         print(f"  [OK] Usuario creado: {email} [{rol}]")
     else:
+        if tenant_id is not None and u.tenant_id != tenant_id:
+            u.tenant_id = tenant_id
+            db.flush()
         print(f"  [SKIP]  Usuario ya existe: {email}")
     return u
 
@@ -129,13 +156,19 @@ def seed():
         print("\n[PKG] SEED INTEGRAL — RutAIGeoProxi Demo Tribunal")
         print("=" * 55)
 
+        # ── Tenant ────────────────────────────────────────────────────
+        print("\n[TENANT] Creando Tenant de Santiago:")
+        tenant = get_or_create_tenant(db, "Red de Asistencia Santiago", "red-asistencia-santiago", "profesional")
+
         # ── Usuarios ──────────────────────────────────────────────────
         print("\n[USER] Usuarios:")
-        get_or_create_user(db, "admin@ruta.com", "Super Admin Demo", "admin", "Password123")
-        cliente1 = get_or_create_user(db, "cliente@ruta.com", "Carlos Mendoza", "cliente", "Password123")
-        cliente2 = get_or_create_user(db, "cliente2@ruta.com", "Ana Torres", "cliente", "Password123")
-        taller_u1 = get_or_create_user(db, "taller@ruta.com", "Taller Mecánico Centro", "taller", "Password123")
-        taller_u2 = get_or_create_user(db, "taller2@ruta.com", "AutoServicios Norte", "taller", "Password123")
+        admin_user = get_or_create_user(db, "admin@ruta.com", "Admin Santiago", "admin", "Password123", tenant_id=tenant.id)
+        get_or_create_membership(db, admin_user.id, tenant.id, "owner")
+        
+        cliente1 = get_or_create_user(db, "cliente@ruta.com", "Carlos Mendoza", "cliente", "Password123", tenant_id=tenant.id)
+        cliente2 = get_or_create_user(db, "cliente2@ruta.com", "Ana Torres", "cliente", "Password123", tenant_id=tenant.id)
+        taller_u1 = get_or_create_user(db, "taller@ruta.com", "Taller Mecánico Centro", "taller", "Password123", tenant_id=tenant.id)
+        taller_u2 = get_or_create_user(db, "taller2@ruta.com", "AutoServicios Norte", "taller", "Password123", tenant_id=tenant.id)
         db.commit()
 
         # ── Vehículos ─────────────────────────────────────────────────
@@ -156,6 +189,7 @@ def seed():
             especialidades=["mecanico", "electrico", "neumaticos"],
             esta_activo=True,
             estado_registro="completado",
+            tenant_id=tenant.id,
         )
         taller2 = get_or_create_workshop(
             db, "AutoServicios Norte", taller_u2.id,
@@ -166,6 +200,7 @@ def seed():
             especialidades=["carroceria", "mecanico", "emergencia_vial"],
             esta_activo=True,
             estado_registro="completado",
+            tenant_id=tenant.id,
         )
         db.commit()
 
@@ -199,6 +234,7 @@ def seed():
             estado="nuevo",
             latitud=-33.4500, longitud=-70.6600,
             direccion="Av. Principal 500, Santiago",
+            tenant_id=tenant.id,
         )
 
         # Incidente 2: clasificado con IA
@@ -211,6 +247,7 @@ def seed():
             direccion="Autopista Central km 23",
             severidad="grave",
             categoria="mecanico",
+            tenant_id=tenant.id,
         )
 
         # Incidente 3: asignado a taller
@@ -223,6 +260,7 @@ def seed():
             direccion="Calle Los Cerezos 45",
             severidad="moderado",
             categoria="electrico",
+            tenant_id=tenant.id,
         )
 
         # Incidente 4: resuelto y pagado
@@ -235,6 +273,7 @@ def seed():
             direccion="Ruta 68 km 10",
             severidad="leve",
             categoria="neumaticos",
+            tenant_id=tenant.id,
         )
         db.commit()
 
@@ -309,6 +348,7 @@ def seed():
         existing_pago = db.query(Pago).filter(Pago.incidente_id == inc4.id).first()
         if not existing_pago:
             db.add(Pago(
+                tenant_id=tenant.id,
                 incidente_id=inc4.id,
                 monto=45000.0,
                 comision_plataforma=4500.0,

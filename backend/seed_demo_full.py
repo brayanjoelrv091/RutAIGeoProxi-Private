@@ -155,6 +155,7 @@ def seed():
             email="taller@ruta.com",
             especialidades=["mecanico", "electrico", "neumaticos"],
             esta_activo=True,
+            estado_registro="completado",
         )
         taller2 = get_or_create_workshop(
             db, "AutoServicios Norte", taller_u2.id,
@@ -164,6 +165,7 @@ def seed():
             email="taller2@ruta.com",
             especialidades=["carroceria", "mecanico", "emergencia_vial"],
             esta_activo=True,
+            estado_registro="completado",
         )
         db.commit()
 

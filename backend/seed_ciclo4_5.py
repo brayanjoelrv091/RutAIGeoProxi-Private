@@ -109,6 +109,7 @@ def seed_database():
                 longitud=t_data['lng'],
                 especialidades={"principal": t_data['esp']},
                 esta_activo=True,
+                estado_registro="completado",
                 ultimo_heartbeat=datetime.now(timezone.utc)
             )
             db.add(taller)

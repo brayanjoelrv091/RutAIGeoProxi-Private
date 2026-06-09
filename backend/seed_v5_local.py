@@ -49,7 +49,8 @@ def seed_v5_local():
             latitud=-17.7833, longitud=-63.1821,
             telefono="+59170011223",
             email="fitgo61@gmail.com",
-            especialidades=["mecanico", "electrico"]
+            especialidades=["mecanico", "electrico"],
+            estado_registro="completado"
         )
         db.add(taller)
         db.flush()

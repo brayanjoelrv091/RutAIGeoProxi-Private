@@ -14,6 +14,7 @@ import '../modules/workshops/models/workshop_model.dart';
 import '../modules/workshops/services/workshop_service.dart';
 import '../modules/offline/connectivity_monitor.dart';
 import 'dart:async';
+import 'workshop_explorer_screen.dart';
 
 class ReportIncidentScreen extends StatefulWidget {
   const ReportIncidentScreen({super.key});
@@ -540,11 +541,12 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                 items: const [
                   DropdownMenuItem(value: 'general', child: Text('General (Todos los talleres)')),
                   DropdownMenuItem(value: 'preferido', child: Text('Taller Preferencial (Mis favoritos)')),
+                  DropdownMenuItem(value: 'manual', child: Text('Seleccionar taller manual (Mapa)')),
                 ],
                 onChanged: (val) {
                   setState(() {
                     _tipoBusqueda = val ?? 'general';
-                    if (_tipoBusqueda != 'preferido') {
+                    if (_tipoBusqueda != 'preferido' && _tipoBusqueda != 'manual') {
                       _tallerPreferidoId = null;
                     }
                   });
@@ -578,6 +580,41 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   padding: EdgeInsets.only(top: 8.0),
                   child: Text('No tienes talleres favoritos registrados.', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
                 ),
+              if (_tipoBusqueda == 'manual') ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final Workshop? selected = await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const WorkshopExplorerScreen(isSelecting: true)),
+                    );
+                    if (selected != null) {
+                      setState(() {
+                        _tallerPreferidoId = selected.id;
+                        // Add to favorites temporally to show name, or just handle id
+                        if (!_favoritos.any((w) => w.id == selected.id)) {
+                          _favoritos.add(selected);
+                        }
+                      });
+                      if (mounted) {
+                         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Taller seleccionado: ${selected.nombre}')));
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.map, color: Color(0xFF00F2FF)),
+                  label: Text(_tallerPreferidoId != null ? 'Taller Seleccionado ✓' : 'Abrir Mapa para Seleccionar'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF00F2FF),
+                    side: const BorderSide(color: Color(0xFF00F2FF)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+                if (_tallerPreferidoId == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8.0),
+                    child: Text('Debes seleccionar un taller del mapa.', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                  ),
+              ],
 
               const SizedBox(height: 32),
 

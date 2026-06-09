@@ -57,6 +57,12 @@ class Incidente(Base):
     categoria = Column(String(50), nullable=True)    # mecanico | electrico | carroceria | ...
     tipo_busqueda = Column(String(30), default="general", nullable=False) # general | categoria | preferido
     taller_preferido_id = Column(Integer, ForeignKey("talleres.id", ondelete="SET NULL"), nullable=True, index=True)
+    
+    # ── Tracking de GPS (Nuevos campos) ──
+    taller_latitud = Column(Float, nullable=True)
+    taller_longitud = Column(Float, nullable=True)
+    tiempo_llegada_estimado_minutos = Column(Integer, nullable=True)
+
     tiempo_estimado_reparacion_minutos = Column(Integer, nullable=True) # CU-32: ETA dinámico
     idempotency_key = Column(
         String(64),

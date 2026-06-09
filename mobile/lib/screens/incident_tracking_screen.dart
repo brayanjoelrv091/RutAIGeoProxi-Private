@@ -9,6 +9,7 @@ import '../config.dart';
 import '../modules/realtime/websocket_service.dart';
 import '../modules/realtime/gps_tracker.dart';
 import '../session.dart';
+import 'support_chat_screen.dart';
 
 /// P8 · CU-26 — Pantalla de tracking GPS en vivo.
 ///
@@ -98,6 +99,8 @@ class _IncidentTrackingScreenState extends State<IncidentTrackingScreen> {
     });
   }
 
+  int? _etaMinutes;
+
   Future<void> _updateRoute(double currentLat, double currentLng) async {
     if (_destination == null) return;
     final now = DateTime.now();
@@ -112,11 +115,15 @@ class _IncidentTrackingScreenState extends State<IncidentTrackingScreen> {
         final data = jsonDecode(res.body);
         if (data['routes'] != null && data['routes'].isNotEmpty) {
           final coords = data['routes'][0]['geometry']['coordinates'] as List;
+          final durationSecs = data['routes'][0]['duration'] as num?;
           if (mounted) {
             setState(() {
               _routePoints.clear();
               for (var c in coords) {
                 _routePoints.add(LatLng(c[1], c[0])); // geojson is lng, lat
+              }
+              if (durationSecs != null) {
+                _etaMinutes = (durationSecs / 60).round();
               }
             });
           }
@@ -184,6 +191,22 @@ class _IncidentTrackingScreenState extends State<IncidentTrackingScreen> {
       ),
       body: Column(
         children: [
+          // Banner de ETA
+          if (_etaMinutes != null)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              color: const Color(0xFF1A213A),
+              child: Row(
+                children: [
+                  const Icon(Icons.timer, color: Color(0xFF00F2FF)),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Tiempo estimado de llegada: $_etaMinutes min',
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
           // Mapa
           Expanded(
             child: FlutterMap(
@@ -286,12 +309,32 @@ class _IncidentTrackingScreenState extends State<IncidentTrackingScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _toggleTracking,
-        backgroundColor: _isTracking ? Colors.red : const Color(0xFF00F2FF),
-        foregroundColor: _isTracking ? Colors.white : Colors.black,
-        icon: Icon(_isTracking ? Icons.stop : Icons.play_arrow),
-        label: Text(_isTracking ? 'Detener' : 'Iniciar Tracking'),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'chat_btn',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SupportChatScreen()),
+              );
+            },
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF0A0E1A),
+            child: const Icon(Icons.chat_bubble),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton.extended(
+            heroTag: 'tracking_btn',
+            onPressed: _toggleTracking,
+            backgroundColor: _isTracking ? Colors.red : const Color(0xFF00F2FF),
+            foregroundColor: _isTracking ? Colors.white : Colors.black,
+            icon: Icon(_isTracking ? Icons.stop : Icons.play_arrow),
+            label: Text(_isTracking ? 'Detener' : 'Iniciar Tracking'),
+          ),
+        ],
       ),
     );
   }

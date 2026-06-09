@@ -115,7 +115,69 @@ def update_heartbeat(
         return {"status": "error", "message": "No tiene taller registrado"}
     return {"status": "ok"}
 
+from pydantic import BaseModel
+class LocationUpdate(BaseModel):
+    latitud: float
+    longitud: float
 
+@router.post(
+    "/me/location",
+    status_code=status.HTTP_200_OK,
+    summary="Actualizar ubicación GPS del taller en tiempo real",
+)
+def update_location(
+    schema: LocationUpdate,
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(require_operational_roles("taller", "admin")),
+):
+    taller = db.query(Taller).filter(Taller.usuario_propietario_id == current.id).first()
+    if not taller:
+        raise HTTPException(status_code=404, detail="No tiene taller registrado")
+    
+    taller.latitud = schema.latitud
+    taller.longitud = schema.longitud
+    
+    # Buscar incidentes asignados que estén en "en_camino" o "taller_asignado"
+    from app.modules.p2_incidentes.models import Incidente
+    from math import radians, cos, sin, asin, sqrt
+
+    def haversine(lon1, lat1, lon2, lat2):
+        lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+        dlon = lon2 - lon1 
+        dlat = lat2 - lat1 
+        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+        c = 2 * asin(sqrt(a)) 
+        r = 6371 # km
+        return c * r
+
+    incidentes_activos = db.query(Incidente).filter(
+        Incidente.tenant_id == taller.tenant_id, # asume que están en el mismo tenant, o puedes vincular por taller_asignado si tuvieran
+        Incidente.estado.in_(["taller_asignado", "en_camino"])
+    ).all()
+
+    # Ojo: No guardamos el id del taller en la tabla incidentes directamente, lo hacemos mediante la tabla Asignacion o simplemente usando el tenant_id y el estado. 
+    # Para ser precisos, filtramos los que tengan asignación a este taller:
+    from app.modules.p4_asignacion.models import Asignacion
+    
+    asignaciones_activas = db.query(Asignacion).filter(
+        Asignacion.taller_id == taller.id,
+        Asignacion.estado.in_(["pendiente", "aceptada"])
+    ).all()
+    
+    incidentes_ids = [a.incidente_id for a in asignaciones_activas]
+    incidentes = db.query(Incidente).filter(Incidente.id.in_(incidentes_ids)).all()
+
+    for inc in incidentes:
+        if inc.estado in ["taller_asignado", "en_camino"]:
+            inc.taller_latitud = schema.latitud
+            inc.taller_longitud = schema.longitud
+            distancia_km = haversine(schema.longitud, schema.latitud, inc.longitud, inc.latitud)
+            # asumiendo velocidad media de 30 km/h en ciudad
+            tiempo_horas = distancia_km / 30.0
+            inc.tiempo_llegada_estimado_minutos = int(tiempo_horas * 60)
+
+    db.commit()
+    return {"status": "ok", "lat": taller.latitud, "lng": taller.longitud}
 
 @router.post(
     "/disconnect",

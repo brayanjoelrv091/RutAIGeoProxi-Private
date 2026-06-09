@@ -6,7 +6,8 @@ import '../modules/workshops/models/workshop_model.dart';
 import '../modules/workshops/services/workshop_service.dart';
 
 class WorkshopExplorerScreen extends StatefulWidget {
-  const WorkshopExplorerScreen({super.key});
+  final bool isSelecting;
+  const WorkshopExplorerScreen({super.key, this.isSelecting = false});
 
   @override
   State<WorkshopExplorerScreen> createState() => _WorkshopExplorerScreenState();
@@ -248,11 +249,15 @@ class _WorkshopExplorerScreenState extends State<WorkshopExplorerScreen> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () {
-                  // TODO: Add to favorites or select for incident
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Taller seleccionado')));
+                  if (widget.isSelecting) {
+                    Navigator.pop(context, w);
+                  } else {
+                    // TODO: Add to favorites
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Taller seleccionado')));
+                  }
                 },
                 icon: const Icon(Icons.check_circle, color: Colors.black),
-                label: const Text('SELECCIONAR COMO FAVORITO', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                label: Text(widget.isSelecting ? 'SELECCIONAR ESTE TALLER' : 'SELECCIONAR COMO FAVORITO', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00F2FF),
                   padding: const EdgeInsets.symmetric(vertical: 12),

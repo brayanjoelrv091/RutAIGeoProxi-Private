@@ -151,6 +151,29 @@ def asignar_taller(
 ):
     return IncidentService.asignar_taller(db, incident_id, payload.taller_id, background_tasks)
 
+@router.get(
+    "/{incident_id}/tracking",
+    summary="Obtener tracking GPS y ETA del taller asignado",
+)
+def get_incident_tracking(
+    incident_id: int,
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(get_current_user),
+):
+    return IncidentService.get_tracking(db, incident_id)
+
+@router.post(
+    "/{incident_id}/llegada-taller",
+    summary="Taller notifica que ha llegado al lugar del incidente",
+)
+def report_arrival(
+    incident_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(require_operational_roles("taller", "admin")),
+):
+    return IncidentService.report_arrival(db, incident_id, background_tasks)
+
 @router.patch(
     "/{incident_id}/estado",
     summary="CU-25 · Actualizar estado del incidente en tiempo real",

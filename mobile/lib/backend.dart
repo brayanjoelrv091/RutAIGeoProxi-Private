@@ -316,4 +316,68 @@ class Backend {
     } catch (_) {}
     return [];
   }
+
+  // --- Tracking y Llegada ---
+
+  static Future<Map<String, dynamic>?> getIncidentTracking(int incidentId) async {
+    try {
+      final response = await http.get(_uri('/incidentes/$incidentId/tracking'), headers: await _headers());
+      if (response.statusCode == 200) return jsonDecode(response.body);
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<bool> reportArrival(int incidentId) async {
+    try {
+      final response = await http.post(_uri('/incidentes/$incidentId/llegada-taller'), headers: await _headers());
+      return response.statusCode == 200;
+    } catch (_) {}
+    return false;
+  }
+
+  static Future<bool> updateLocation(double lat, double lng) async {
+    try {
+      final response = await http.post(
+        _uri('/workshops/me/location'),
+        headers: await _headers(jsonBody: true),
+        body: jsonEncode({'latitud': lat, 'longitud': lng}),
+      );
+      return response.statusCode == 200;
+    } catch (_) {}
+    return false;
+  }
+
+  // --- Pagos (Efectivo y QR) ---
+
+  static Future<bool> requestCashPayment(int incidentId) async {
+    try {
+      final response = await http.post(_uri('/payments/cash/$incidentId'), headers: await _headers());
+      return response.statusCode == 200;
+    } catch (_) {}
+    return false;
+  }
+
+  static Future<bool> confirmCashPayment(int incidentId) async {
+    try {
+      final response = await http.post(_uri('/payments/confirm-cash/$incidentId'), headers: await _headers());
+      return response.statusCode == 200;
+    } catch (_) {}
+    return false;
+  }
+
+  static Future<Map<String, dynamic>?> requestQrPayment(int incidentId) async {
+    try {
+      final response = await http.post(_uri('/payments/qr/$incidentId'), headers: await _headers());
+      if (response.statusCode == 200) return jsonDecode(response.body);
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<bool> confirmQrPayment(int incidentId) async {
+    try {
+      final response = await http.post(_uri('/payments/confirm-qr/$incidentId'), headers: await _headers());
+      return response.statusCode == 200;
+    } catch (_) {}
+    return false;
+  }
 }

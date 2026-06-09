@@ -5,6 +5,7 @@ import 'map_explorer_screen.dart';
 import 'workshop_explorer_screen.dart';
 import 'quotation_detail_screen.dart';
 import 'tenant_dashboard_screen.dart';
+import 'support_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.onLogout});
@@ -197,6 +198,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ],
             ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SupportChatScreen()),
+          );
+        },
+        backgroundColor: const Color(0xFF00F2FF),
+        foregroundColor: Colors.black,
+        child: const Icon(Icons.support_agent),
+        tooltip: 'Soporte en línea',
+      ),
     );
   }
 

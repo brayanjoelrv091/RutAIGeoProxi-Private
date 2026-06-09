@@ -599,3 +599,41 @@ class IncidentService:
         background_tasks.add_task(lambda: asyncio.create_task(delayed_fallback()))
         
         return incidente
+
+    @staticmethod
+    def get_tracking(db: Session, incident_id: int) -> dict:
+        """Obtener la ubicación del taller y el ETA."""
+        incidente = db.query(Incidente).filter(Incidente.id == incident_id).first()
+        if not incidente:
+            raise HTTPException(status_code=404, detail="Incidente no encontrado")
+        
+        return {
+            "incidente_id": incidente.id,
+            "estado": incidente.estado,
+            "taller_latitud": incidente.taller_latitud,
+            "taller_longitud": incidente.taller_longitud,
+            "tiempo_llegada_estimado_minutos": incidente.tiempo_llegada_estimado_minutos,
+        }
+
+    @staticmethod
+    def report_arrival(db: Session, incident_id: int, background_tasks: BackgroundTasks) -> dict:
+        """El taller reporta que ha llegado al lugar del incidente."""
+        from app.modules.p5_pagos.services import NotificationService
+        incidente = db.query(Incidente).filter(Incidente.id == incident_id).first()
+        if not incidente:
+            raise HTTPException(status_code=404, detail="Incidente no encontrado")
+        
+        incidente.estado = "taller_en_lugar"
+        db.commit()
+
+        # Enviar Push al cliente
+        background_tasks.add_task(
+            NotificationService.send_push_notification,
+            db=db,
+            user_id=incidente.usuario_id,
+            titulo="¡El taller ha llegado!",
+            mensaje="El técnico ya se encuentra en tu ubicación."
+        )
+
+        return {"status": "ok", "incidente_id": incidente.id, "estado": incidente.estado}
+

@@ -80,6 +80,115 @@ def create_checkout_session(
     
     return {"checkout_url": result["checkout_url"]}
 
+@router.post("/cash/{incidente_id}", summary="Solicitar pago en efectivo")
+def request_cash_payment(
+    incidente_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    from app.modules.p2_incidentes.models import Incidente
+    from app.modules.p4_asignacion.models import Asignacion
+    from app.modules.p3_talleres.models import Taller
+    from app.modules.p5_pagos.services import NotificationService
+
+    incidente = db.query(Incidente).filter(Incidente.id == incidente_id).first()
+    if not incidente:
+        raise HTTPException(status_code=404, detail="Incidente no encontrado")
+        
+    if current_user.rol == "cliente" and incidente.usuario_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No puedes pagar este incidente")
+        
+    incidente.estado = "esperando_pago_efectivo"
+    db.commit()
+
+    # Notificar al taller
+    asignacion = db.query(Asignacion).filter(Asignacion.incidente_id == incidente_id, Asignacion.estado == "aceptada").first()
+    if asignacion:
+        taller = db.query(Taller).filter(Taller.id == asignacion.taller_id).first()
+        if taller:
+            background_tasks.add_task(
+                NotificationService.send_push_notification,
+                db=db,
+                user_id=taller.usuario_propietario_id,
+                titulo="Pago en Efectivo Solicitado",
+                mensaje=f"El cliente ha seleccionado pago en efectivo para el incidente #{incidente.id}. Confirma al recibir el dinero."
+            )
+            
+    return {"status": "ok", "message": "Pago en efectivo solicitado"}
+
+@router.post("/confirm-cash/{incidente_id}", summary="Taller confirma recepción de efectivo")
+def confirm_cash_payment(
+    incidente_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_operational_roles("taller", "admin"))
+):
+    from app.modules.p2_incidentes.models import Incidente
+    from app.modules.p5_pagos.services import NotificationService
+
+    incidente = db.query(Incidente).filter(Incidente.id == incidente_id).first()
+    if not incidente:
+        raise HTTPException(status_code=404, detail="Incidente no encontrado")
+        
+    incidente.estado = "pagado"
+    db.commit()
+
+    # Notificar al cliente
+    background_tasks.add_task(
+        NotificationService.send_push_notification,
+        db=db,
+        user_id=incidente.usuario_id,
+        titulo="Pago Confirmado",
+        mensaje=f"El taller ha confirmado tu pago en efectivo. ¡Gracias!"
+    )
+            
+    return {"status": "ok", "message": "Pago confirmado"}
+
+@router.post("/qr/{incidente_id}", summary="Generar QR simulado")
+def request_qr_payment(
+    incidente_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    import uuid
+    # Simplemente devolvemos un hash para que el cliente genere un QR visualmente
+    return {"status": "ok", "qr_data": f"rutaigeoproxi-pago-qr-{incidente_id}-{uuid.uuid4().hex[:8]}"}
+
+@router.post("/confirm-qr/{incidente_id}", summary="Simular que el QR fue pagado con éxito")
+def confirm_qr_payment(
+    incidente_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user)
+):
+    from app.modules.p2_incidentes.models import Incidente
+    from app.modules.p4_asignacion.models import Asignacion
+    from app.modules.p3_talleres.models import Taller
+    from app.modules.p5_pagos.services import NotificationService
+
+    incidente = db.query(Incidente).filter(Incidente.id == incidente_id).first()
+    if not incidente:
+        raise HTTPException(status_code=404, detail="Incidente no encontrado")
+        
+    incidente.estado = "pagado"
+    db.commit()
+
+    # Notificar al taller
+    asignacion = db.query(Asignacion).filter(Asignacion.incidente_id == incidente_id, Asignacion.estado == "aceptada").first()
+    if asignacion:
+        taller = db.query(Taller).filter(Taller.id == asignacion.taller_id).first()
+        if taller:
+            background_tasks.add_task(
+                NotificationService.send_push_notification,
+                db=db,
+                user_id=taller.usuario_propietario_id,
+                titulo="Pago por QR Recibido",
+                mensaje=f"El cliente ha pagado el incidente #{incidente.id} mediante código QR."
+            )
+            
+    return {"status": "ok", "message": "Pago QR confirmado"}
+
 from fastapi import Request
 
 @router.post("/webhook", summary="CU-33 · Webhook Seguro de Stripe")

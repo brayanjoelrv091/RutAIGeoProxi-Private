@@ -65,6 +65,10 @@ class IncidentOut(BaseModel):
     categoria: str | None
     tipo_busqueda: str
     taller_preferido_id: int | None
+    taller_latitud: float | None = None
+    taller_longitud: float | None = None
+    tiempo_llegada_estimado_minutos: int | None = None
+    tiempo_estimado_reparacion_minutos: int | None = None
     creado_en: datetime
     actualizado_en: datetime | None
 

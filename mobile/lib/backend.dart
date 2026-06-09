@@ -234,11 +234,29 @@ class Backend {
     if (response.statusCode == 201 || response.statusCode == 200) return null;
     try {
       final error = jsonDecode(response.body);
-      final detail = error['detail']?.toString();
-      if (response.statusCode == 400 && detail != null && detail.contains('Hash corrupto')) {
-        return detail;
+      final detail = error['detail'];
+      if (detail is List) {
+        final messages = detail.map((err) {
+          if (err is Map) {
+            final msg = err['msg']?.toString();
+            final loc = err['loc'] as List?;
+            final fieldName = loc != null && loc.isNotEmpty ? loc.last.toString() : '';
+            if (msg != null) {
+              if (fieldName.isNotEmpty) {
+                return 'Campo "$fieldName": $msg';
+              }
+              return msg;
+            }
+          }
+          return err.toString();
+        }).join('\n');
+        return messages;
       }
-      return detail ?? 'Error ${response.statusCode}';
+      final detailStr = detail?.toString();
+      if (response.statusCode == 400 && detailStr != null && detailStr.contains('Hash corrupto')) {
+        return detailStr;
+      }
+      return detailStr ?? 'Error ${response.statusCode}';
     } catch (_) {}
     return 'Error ${response.statusCode}';
   }

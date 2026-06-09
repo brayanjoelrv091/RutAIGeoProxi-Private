@@ -34,7 +34,7 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
       // Por ahora probaremos a hacer un fetch simulado o un HTTP call real.
       
       final response = await http.get(
-        Uri.parse('${AppConfig.baseUrl}/incidentes/${widget.incidentId}'),
+        Uri.parse('${AppConfig.baseUrl}/incidents/${widget.incidentId}'),
         headers: {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',

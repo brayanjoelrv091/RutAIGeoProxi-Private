@@ -593,7 +593,11 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
                   fillColor: const Color(0xFF111629),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 ),
-                validator: (v) => v == null || v.isEmpty ? 'Requerido' : null,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Requerido';
+                  if (v.trim().length < 3) return 'Debe tener al menos 3 caracteres';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 

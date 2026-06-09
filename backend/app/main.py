@@ -211,20 +211,27 @@ app.include_router(analytics_router)
 @app.get("/api/v1/seed-cloud-full", tags=["Mantenimiento"])
 def seed_cloud_full():
     """Ruta para correr el seed completo en la base de datos de Render."""
+    import sys
+    import os
+    import io
+    dir_actual = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(dir_actual)
+    if root_dir not in sys.path:
+        sys.path.insert(0, root_dir)
+        
+    old_stdout = sys.stdout
+    new_stdout = io.StringIO()
+    sys.stdout = new_stdout
     try:
-        import sys
-        import os
-        dir_actual = os.path.dirname(os.path.abspath(__file__))
-        root_dir = os.path.dirname(dir_actual)
-        if root_dir not in sys.path:
-            sys.path.insert(0, root_dir)
-            
         from seed_demo_full import seed
         seed()
-        return {"status": "exito", "mensaje": "Base de datos de Render poblada con datos demo del tribunal."}
+        output = new_stdout.getvalue()
+        return {"status": "exito", "mensaje": "Base de datos de Render poblada con datos demo.", "logs": output}
     except Exception as e:
         import traceback
-        return {"status": "error", "detalle": str(e), "trace": traceback.format_exc()}
+        return {"status": "error", "detalle": str(e), "trace": traceback.format_exc(), "logs": new_stdout.getvalue()}
+    finally:
+        sys.stdout = old_stdout
 
 # ── Root endpoint ──
 @app.get("/api/v1/wipe-database-danger-zona", tags=["Mantenimiento"])

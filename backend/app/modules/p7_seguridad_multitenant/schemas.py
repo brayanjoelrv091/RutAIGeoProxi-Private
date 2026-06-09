@@ -93,3 +93,24 @@ class TenantSuperadminUpgradeRequest(BaseModel):
     nuevo_plan: str
     metodo_pago: str
     monto_pago: float
+
+class TenantDashboardOut(BaseModel):
+    tenant_id: int
+    nombre: str
+    plan: str
+    estado_pago: str | None = None
+    fecha_fin_plan: datetime | None = None
+    limite_talleres: int | str
+    talleres_registrados: int
+    limite_usuarios: int | str
+    usuarios_registrados: int
+
+class TenantMemberOut(BaseModel):
+    id: int
+    nombre: str
+    email: str
+    rol: str
+    rol_en_tenant: str
+    esta_activo: bool
+    creado_en: datetime
+

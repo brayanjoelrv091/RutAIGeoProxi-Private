@@ -65,6 +65,8 @@ class TenantOut(TenantBase):
     monto_pago: float | None = None
     checkout_url: str | None = None
     historial_suscripciones: list[TenantSubscriptionHistoryOut] = []
+    talleres_registrados: int = 0
+    limite_talleres: str | int = 0
 
     model_config = {"from_attributes": True}
 

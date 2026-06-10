@@ -14,6 +14,8 @@ export interface Tenant {
   estado_pago: string;
   metodo_pago?: string;
   checkout_url?: string;
+  talleres_registrados?: number;
+  limite_talleres?: string | number;
   creado_en: string;
 }
 

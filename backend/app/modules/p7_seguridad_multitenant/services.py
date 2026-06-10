@@ -182,7 +182,13 @@ class TenantService:
 
     @staticmethod
     def get_tenants(db: Session, skip: int = 0, limit: int = 100) -> list[Tenant]:
-        return db.query(Tenant).offset(skip).limit(limit).all()
+        from app.modules.p3_talleres.models import Taller
+        tenants = db.query(Tenant).offset(skip).limit(limit).all()
+        for t in tenants:
+            t.talleres_registrados = db.query(Taller).filter(Taller.tenant_id == t.id).count()
+            plan = (t.plan or "basico").lower()
+            t.limite_talleres = 1 if plan in ("gratis", "basico") else (3 if plan == "profesional" else "Ilimitado")
+        return tenants
 
     @staticmethod
     def get_tenant_by_id(db: Session, tenant_id: int) -> Tenant:

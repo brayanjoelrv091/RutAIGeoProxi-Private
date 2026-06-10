@@ -56,8 +56,8 @@
               <p><span>Correo:</span> {{ me.email }}</p>
               <p><span>Rol:</span> <span class="badge" [class.superadmin-badge]="me.rol === 'admin' && me.tenant_id === null">{{ (me.rol === 'admin' && me.tenant_id === null) ? 'SUPERADMIN' : (me.rol | uppercase) }}</span></p>
 
-              <!-- Suscripción Widget (Solo para Admins) -->
-              @if (isAdmin) {
+              <!-- Suscripción Widget (Solo para Admins de Tenant, no para SuperAdmin) -->
+              @if (isAdmin && !isSuperadmin) {
                 <div class="glass-card mt-3" style="border: 1px solid var(--neon-cyan);">
                   <h3 class="tech-font cyan-text"><i class="fas fa-crown"></i> Suscripción SaaS</h3>
                   <div class="stats-row" style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">

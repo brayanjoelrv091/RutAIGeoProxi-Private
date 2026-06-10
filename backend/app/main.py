@@ -208,172 +208,29 @@ app.include_router(realtime_router)
 app.include_router(analytics_router)
 
 
-@app.get("/api/v1/seed-cloud-full", tags=["Mantenimiento"])
-def seed_cloud_full():
-    """Ruta para correr el seed completo en la base de datos de Render."""
-    import sys
-    import os
-    import io
-    dir_actual = os.path.dirname(os.path.abspath(__file__))
-    root_dir = os.path.dirname(dir_actual)
-    if root_dir not in sys.path:
-        sys.path.insert(0, root_dir)
-        
-    old_stdout = sys.stdout
-    new_stdout = io.StringIO()
-    sys.stdout = new_stdout
-    try:
-        from seed_demo_full import seed
-        seed()
-        output = new_stdout.getvalue()
-        return {"status": "exito", "mensaje": "Base de datos de Render poblada con datos demo.", "logs": output}
-    except Exception as e:
-        import traceback
-        return {"status": "error", "detalle": str(e), "trace": traceback.format_exc(), "logs": new_stdout.getvalue()}
-    finally:
-        sys.stdout = old_stdout
+# ── Endpoints de Mantenimiento / Peligrosos (Comentados por seguridad en producción) ──
 
-# ── Root endpoint ──
-@app.get("/api/v1/wipe-database-danger-zona", tags=["Mantenimiento"])
-def wipe_database_danger_zona():
-    """Ruta temporal secreta para limpiar la base de datos en Render."""
-    from app.shared.database import engine, Base
-    from sqlalchemy import text
-    import logging
-    log = logging.getLogger(__name__)
-    
-    try:
-        log.warning("Iniciando borrado completo de la base de datos...")
-        with engine.connect() as conn:
-            conn.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO public;"))
-            conn.commit()
-        log.info("Esquema public borrado y recreado.")
-        
-        # Volver a crear todas las tablas
-        Base.metadata.create_all(bind=engine)
-        log.info("Tablas recreadas exitosamente.")
-        
-        return {"status": "exito", "mensaje": "Base de datos borrada y recreada exitosamente con el nuevo esquema multitenant."}
-    except Exception as e:
-        import traceback
-        return {"status": "error", "detalle": str(e), "trace": traceback.format_exc()}
+# @app.get("/api/v1/seed-cloud-full", tags=["Mantenimiento"])
+# def seed_cloud_full(): ...
 
-@app.get("/api/v1/patch-taller-db", tags=["Mantenimiento"])
-def patch_taller_db():
-    """Ruta temporal para agregar la columna faltante sin borrar datos."""
-    from app.shared.database import engine
-    from sqlalchemy import text
-    import logging
-    log = logging.getLogger(__name__)
-    
-    try:
-        with engine.begin() as conn:
-            conn.execute(text("ALTER TABLE talleres ADD COLUMN IF NOT EXISTS estado_registro VARCHAR(30) DEFAULT 'pendiente_tecnicos' NOT NULL;"))
-        log.info("Columna estado_registro añadida a talleres.")
-        return {"status": "exito", "mensaje": "Columna añadida con éxito."}
-    except Exception as e:
-        import traceback
-        return {"status": "error", "detalle": str(e), "trace": traceback.format_exc()}
+# @app.get("/api/v1/wipe-database-danger-zona", tags=["Mantenimiento"])
+# def wipe_database_danger_zona(): ...
 
-@app.get("/api/v1/patch-saas-db", tags=["Mantenimiento"])
-def patch_saas_db():
-    """Ruta para agregar columnas de SaaS a la base de datos de Render."""
-    from app.shared.database import engine
-    from sqlalchemy import text
-    import logging
-    log = logging.getLogger(__name__)
-    
-    try:
-        queries = [
-            "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS fecha_fin_plan TIMESTAMP WITH TIME ZONE;",
-            "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS estado_pago VARCHAR(50) NOT NULL DEFAULT 'gratis';",
-            "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS metodo_pago VARCHAR(50) NOT NULL DEFAULT 'ninguno';",
-            "ALTER TABLE tenants ADD COLUMN IF NOT EXISTS monto_pago INTEGER NOT NULL DEFAULT 0;"
-        ]
-        with engine.begin() as conn:
-            for q in queries:
-                conn.execute(text(q))
-        log.info("Columnas de SaaS añadidas a tenants.")
-        return {"status": "exito", "mensaje": "Columnas SaaS añadidas con éxito."}
-    except Exception as e:
-        import traceback
-        return {"status": "error", "detalle": str(e), "trace": traceback.format_exc()}
+# @app.get("/api/v1/patch-taller-db", tags=["Mantenimiento"])
+# def patch_taller_db(): ...
 
-@app.get("/api/v1/test-email", tags=["Mantenimiento"])
-def test_email(to_email: str = "brayanjoelrv091@gmail.com"):
-    """Ruta temporal para probar el envío de correo de forma síncrona y ver el error real."""
-    from app.shared.email import send_reset_email
-    import traceback
-    try:
-        send_reset_email(to_email, "TEST-TOKEN-12345")
-        return {"status": "success", "message": f"Correo enviado síncronamente a {to_email}"}
-    except Exception as e:
-        return {
-            "status": "error", 
-            "error_type": type(e).__name__,
-            "error_message": str(e),
-            "traceback": traceback.format_exc()
-        }
+# @app.get("/api/v1/patch-saas-db", tags=["Mantenimiento"])
+# def patch_saas_db(): ...
 
-@app.get("/api/v1/bootstrap-superadmin", tags=["Mantenimiento"])
-def bootstrap_superadmin():
-    """Ruta temporal para crear o resetear el SuperAdmin."""
-    from app.shared.database import SessionLocal
-    from app.modules.p1_usuarios.models import Usuario
-    from app.shared.security import get_password_hash
-    db = SessionLocal()
-    try:
-        email = "admin@rutaigeoproxi.com"
-        password = "Admin123*"
-        user = db.query(Usuario).filter(Usuario.email == email).first()
-        if user:
-            user.hashed_password = get_password_hash(password)
-            user.rol = "admin"
-            user.tenant_id = None
-            user.esta_activo = True
-            db.commit()
-            return {"status": "exito", "mensaje": "SuperAdmin reseteado exitosamente."}
-        else:
-            nuevo_admin = Usuario(
-                nombre="SuperAdmin Principal",
-                email=email,
-                hashed_password=get_password_hash(password),
-                rol="admin",
-                esta_activo=True,
-                tenant_id=None
-            )
-            db.add(nuevo_admin)
-            db.commit()
-            return {"status": "exito", "mensaje": "SuperAdmin creado exitosamente."}
-    except Exception as e:
-        import traceback
-        return {"status": "error", "detalle": str(e), "trace": traceback.format_exc()}
-    finally:
-        db.close()
+# @app.get("/api/v1/test-email", tags=["Mantenimiento"])
+# def test_email(...): ...
 
-@app.get("/api/v1/fix-tenants", tags=["Mantenimiento"])
-def fix_tenants():
-    """Asigna tenant_id a los administradores que quedaron sin tenant_id por el bug anterior."""
-    from app.shared.database import SessionLocal
-    from app.modules.p1_usuarios.models import Usuario
-    from app.modules.p7_seguridad_multitenant.models import TenantMembership
-    db = SessionLocal()
-    try:
-        # Buscar todas las membresias owner
-        memberships = db.query(TenantMembership).filter(TenantMembership.rol_en_tenant == "owner").all()
-        arreglados = 0
-        for m in memberships:
-            user = db.query(Usuario).filter(Usuario.id == m.usuario_id).first()
-            if user and user.tenant_id is None:
-                user.tenant_id = m.tenant_id
-                arreglados += 1
-        db.commit()
-        return {"status": "exito", "mensaje": f"Se arreglaron {arreglados} usuarios asignandoles su tenant correcto."}
-    except Exception as e:
-        import traceback
-        return {"status": "error", "detalle": str(e), "trace": traceback.format_exc()}
-    finally:
-        db.close()
+# @app.get("/api/v1/bootstrap-superadmin", tags=["Mantenimiento"])
+# def bootstrap_superadmin(): ...
+
+# @app.get("/api/v1/fix-tenants", tags=["Mantenimiento"])
+# def fix_tenants(): ...
+
 
 @app.get("/", tags=["Sistema"])
 @app.head("/", tags=["Sistema"])

@@ -80,6 +80,7 @@ export class WorkshopService {
     longitud: number;
     telefono?: string;
     email?: string;
+    password?: string;
     especialidades?: string[];
   }): Observable<Workshop> {
     return this.http.post<Workshop>(`${this.base}/workshops`, data);

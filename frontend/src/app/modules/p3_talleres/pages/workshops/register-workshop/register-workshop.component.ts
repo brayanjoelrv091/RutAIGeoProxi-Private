@@ -29,6 +29,7 @@ export class RegisterWorkshopComponent implements OnInit, AfterViewInit, OnDestr
     longitud: [0, Validators.required],
     telefono: [''],
     email: [''],
+    password: ['', [Validators.minLength(8)]],
     especialidades: [''],
   });
 
@@ -282,7 +283,7 @@ export class RegisterWorkshopComponent implements OnInit, AfterViewInit, OnDestr
     const specs = v.especialidades ? v.especialidades.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined;
     this.wsSvc.registerWorkshop({
       nombre: v.nombre, direccion: v.direccion, latitud: v.latitud, longitud: v.longitud,
-      telefono: v.telefono || undefined, email: v.email || undefined, especialidades: specs,
+      telefono: v.telefono || undefined, email: v.email || undefined, password: v.password || undefined, especialidades: specs,
     }).subscribe({
       next: (ws) => {
         this.createdWorkshopId = ws.id;

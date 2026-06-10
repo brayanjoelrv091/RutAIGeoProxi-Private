@@ -253,7 +253,11 @@ class TenantService:
                     mode='payment',
                     success_url=f"{frontend_url}/dashboard?payment_success=true",
                     cancel_url=f"{frontend_url}/dashboard?payment_cancelled=true",
-                    client_reference_id=str(tenant.id)
+                    client_reference_id=str(tenant.id),
+                    metadata={
+                        'nuevo_plan': nuevo_plan,
+                        'usuario_id': "owner" # El webhook lo resolverá al owner
+                    }
                 )
                 
                 tenant.checkout_url = session.url
@@ -420,7 +424,11 @@ class TenantService:
                 mode='payment',
                 success_url=success_url,
                 cancel_url=cancel_url,
-                client_reference_id=str(tenant.id)
+                client_reference_id=str(tenant.id),
+                metadata={
+                    'nuevo_plan': nuevo_plan,
+                    'usuario_id': str(superadmin_id)
+                }
             )
             tenant.checkout_url = session.url
             db.commit()

@@ -240,6 +240,42 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                             "monto": float(pago.monto)
                         }
                     )
+        
+        elif session.client_reference_id and session.metadata.get('nuevo_plan'):
+            # Es un pago de suscripción SaaS
+            tenant_id_str = session.client_reference_id
+            nuevo_plan = session.metadata.get('nuevo_plan')
+            usuario_id_str = session.metadata.get('usuario_id')
+            monto = session.amount_total / 100.0 if session.amount_total else 0.0
+            
+            from app.modules.p7_seguridad_multitenant.services import TenantService
+            from app.modules.p7_seguridad_multitenant.models import TenantMembership
+            
+            # Si no vino usuario_id o es "owner", buscamos al dueño del tenant
+            uid = 1 # fallback superadmin
+            if usuario_id_str and usuario_id_str.isdigit():
+                uid = int(usuario_id_str)
+            else:
+                membership = db.query(TenantMembership).filter(
+                    TenantMembership.tenant_id == int(tenant_id_str), 
+                    TenantMembership.rol_en_tenant == "owner"
+                ).first()
+                if membership:
+                    uid = membership.usuario_id
+            
+            # Evitar confirmar dos veces si ya está confirmado
+            from app.modules.p7_seguridad_multitenant.models import Tenant
+            tenant = db.query(Tenant).filter(Tenant.id == int(tenant_id_str)).first()
+            if tenant and tenant.checkout_url:
+                # Significa que sigue pendiente de la URL
+                TenantService.confirm_upgrade_tenant(
+                    db=db,
+                    tenant_id=int(tenant_id_str),
+                    usuario_id=uid,
+                    nuevo_plan=nuevo_plan,
+                    metodo_pago="tarjeta",
+                    monto=monto
+                )
     
     return {"status": "success"}
 

@@ -159,6 +159,26 @@ class PaymentService:
 
 class NotificationService:
     @staticmethod
+    async def send_push_notification_safe(
+        user_id: int,
+        titulo: str,
+        mensaje: str,
+    ):
+        """
+        Versión segura para BackgroundTasks que crea su propia sesión de BD.
+        """
+        from app.shared.database import SessionLocal
+        import logging
+        logger = logging.getLogger(__name__)
+        db = SessionLocal()
+        try:
+            await NotificationService.send_push_notification(db, user_id, titulo, mensaje)
+        except Exception as e:
+            logger.error(f"Error en send_push_notification_safe: {e}")
+        finally:
+            db.close()
+
+    @staticmethod
     async def send_push_notification(
         db: Session,
         user_id: int,

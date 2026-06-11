@@ -196,16 +196,29 @@ class IncidentService:
             accion=f"Reporte de incidente #{incidente.id} ({incidente.categoria})"
         )
 
-        # Enviar Notificación Push a todos los talleres del tenant
+        # Enviar Notificación Push y WS a todos los talleres del tenant
         if tenant_id and background_tasks:
             from app.modules.p3_talleres.models import Taller
             from app.modules.p5_pagos.services import NotificationService
+            from app.shared.websockets import manager
+            import asyncio
+            
             talleres_tenant = db.query(Taller).filter(Taller.tenant_id == tenant_id, Taller.esta_activo == True).all()
             
+            ws_payload = {
+                "type": "nuevo_incidente",
+                "incidente_id": incidente.id,
+                "titulo": "¡Nuevo Incidente Reportado!",
+                "mensaje": f"Un cliente necesita asistencia: {incidente.titulo} ({incidente.severidad})"
+            }
+            
             for t in talleres_tenant:
+                # Transmisión inmediata vía WebSocket (sin DB, 100% en vivo)
+                await manager.send_personal_message(ws_payload, str(t.usuario_propietario_id))
+                
+                # Push Notification y Notificación DB segura en background
                 background_tasks.add_task(
-                    NotificationService.send_push_notification,
-                    db=db,
+                    NotificationService.send_push_notification_safe,
                     user_id=t.usuario_propietario_id,
                     titulo="¡Nuevo Incidente Reportado!",
                     mensaje=f"Un cliente necesita asistencia: {incidente.titulo} ({incidente.severidad})"

@@ -32,26 +32,15 @@ class AuditService:
             if user:
                 tenant_id = user.tenant_id
 
-        # Generar secuencia
-        tenant_secuencia = None
-        codigo_visual = None
-        if tenant_id:
-            max_sec = db.query(func.max(Bitacora.tenant_secuencia)).filter(Bitacora.tenant_id == tenant_id).scalar() or 0
-            tenant_secuencia = int(max_sec) + 1
-            codigo_visual = f"BIT-{tenant_secuencia:04d}"
-        else:
-            max_sec = db.query(func.max(Bitacora.tenant_secuencia)).filter(Bitacora.tenant_id.is_(None)).scalar() or 0
-            tenant_secuencia = int(max_sec) + 1
-            codigo_visual = f"SYS-{tenant_secuencia:04d}"
-
         b = Bitacora(
             usuario_id=usuario_id,
             tenant_id=tenant_id,
-            tenant_secuencia=tenant_secuencia,
-            codigo_visual=codigo_visual,
             rol=rol,
             accion=accion,
             ip=ip_addr
         )
         db.add(b)
+        db.flush()
+        if b.id:
+            b.codigo_visual = f"BIT-{b.id:04d}" if tenant_id else f"SYS-{b.id:04d}"
         db.commit()

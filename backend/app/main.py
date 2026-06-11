@@ -91,11 +91,17 @@ async def lifespan(_app: FastAPI):
         from sqlalchemy import text
         with engine.connect() as conn:
             conn.execute(text("ALTER TABLE reportes_generados ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE;"))
+            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS taller_latitud DOUBLE PRECISION NULL;"))
+            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS taller_longitud DOUBLE PRECISION NULL;"))
+            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS tiempo_llegada_estimado_minutos INTEGER NULL;"))
+            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS codigo_visual VARCHAR(20) NULL;"))
+            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS tiempo_estimado_reparacion_minutos INTEGER NULL;"))
+            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(64) NULL;"))
+            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS creado_en_local TIMESTAMP WITH TIME ZONE NULL;"))
             conn.commit()
-            logger.info("✅ Columna tenant_id inyectada en reportes.")
+            logger.info("✅ Columnas inyectadas en reportes e incidentes.")
     except Exception as e:
-        logger.error(f"Error al inyectar columnas multi-tenant: {e}")
-        pass
+        logger.error(f"Error al inyectar columnas: {e}")
     # ----------------------------------------------------
 
     # Firebase Admin SDK es opcional — solo para notificaciones push.

@@ -78,6 +78,8 @@ class TenantOut(BaseModel):
     admin_nombre: str | None = None
     admin_email: str | None = None
     total_pagado: int = 0
+    talleres_registrados: int = 0
+    limite_talleres: int = 1
     historial_suscripciones: List[TenantSubscriptionHistoryOut] = []
     
     class Config:
@@ -142,7 +144,16 @@ def list_all_tenants(
 ):
     """Obtiene la lista de todas las suscripciones (empresas) registradas en el sistema."""
     from app.modules.p7_seguridad_multitenant.models import TenantMembership
+    from app.modules.p3_talleres.models import Taller
     from sqlalchemy.orm import joinedload
+    
+    LIMITES_POR_PLAN = {
+        "gratis": 1,
+        "basico": 1,
+        "profesional": 3,
+        "empresarial": 9999
+    }
+    
     tenants = db.query(Tenant).options(joinedload(Tenant.historial_suscripciones)).order_by(Tenant.creado_en.desc()).all()
     for t in tenants:
         membership = db.query(TenantMembership).filter(TenantMembership.tenant_id == t.id, TenantMembership.rol_en_tenant == "owner").first()
@@ -158,7 +169,26 @@ def list_all_tenants(
         total_pago = sum(h.monto_pago for h in t.historial_suscripciones if h.estado_pago == 'pagado')
         setattr(t, "total_pagado", total_pago)
         
+        # Calcular talleres registrados y límite
+        talleres_count = db.query(Taller).filter(Taller.tenant_id == t.id).count()
+        setattr(t, "talleres_registrados", talleres_count)
+        setattr(t, "limite_talleres", LIMITES_POR_PLAN.get(t.plan.lower(), 1))
+        
     return tenants
+
+class SaasKpisOut(BaseModel):
+    total_tenants: int
+    active_tenants: int
+
+@router.get("/kpis", response_model=SaasKpisOut, summary="Dashboard KPIs de SaaS")
+def get_saas_kpis(
+    db: Session = Depends(get_db),
+    _current: Usuario = Depends(require_superadmin)
+):
+    """Retorna KPIs globales del sistema SaaS para el SuperAdmin."""
+    total = db.query(Tenant).count()
+    activos = db.query(Tenant).filter(Tenant.esta_activo == True).count()
+    return {"total_tenants": total, "active_tenants": activos}
 
 @router.patch("/tenants/{tenant_id}/status", response_model=TenantOut, summary="Activar o suspender un tenant (Solo SuperAdmin)")
 def update_tenant_status(

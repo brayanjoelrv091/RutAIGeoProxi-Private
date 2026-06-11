@@ -84,6 +84,20 @@ async def lifespan(_app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("✅ Tablas creadas/verificadas")
 
+    # --- PARCHE DE MIGRACIÓN PARA LA TABLA BITACORA ---
+    # Esto asegura que las columnas nuevas existan sin borrar los datos en Render (sin Alembic).
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE bitacora ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE;"))
+            conn.execute(text("ALTER TABLE bitacora ADD COLUMN IF NOT EXISTS tenant_secuencia INTEGER;"))
+            conn.execute(text("ALTER TABLE bitacora ADD COLUMN IF NOT EXISTS codigo_visual VARCHAR(20);"))
+            conn.commit()
+            logger.info("✅ Parche de columnas en tabla 'bitacora' aplicado exitosamente.")
+    except Exception as e:
+        logger.warning(f"⚠️ No se pudo aplicar el parche a la tabla 'bitacora': {e}")
+    # ----------------------------------------------------
+
     # Firebase Admin SDK es opcional — solo para notificaciones push.
     # Si el paquete no está instalado o las credenciales no están configuradas,
     # el servidor sigue funcionando con normalidad.

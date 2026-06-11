@@ -16,11 +16,14 @@ class ReportService:
         return report_dir
 
     @classmethod
-    def generate_incidents_pdf(cls, db: Session, user_id: int) -> str:
+    def generate_incidents_pdf(cls, db: Session, user_id: int, tenant_id: int | None = None) -> str:
         """
-        Genera un reporte PDF de todos los incidentes.
+        Genera un reporte PDF de todos los incidentes del tenant.
         """
-        incidentes = db.query(Incidente).all()
+        query = db.query(Incidente)
+        if tenant_id is not None:
+            query = query.filter(Incidente.tenant_id == tenant_id)
+        incidentes = query.all()
         
         # Lazy imports para evitar errores al iniciar si no están instalados
         try:
@@ -75,6 +78,7 @@ class ReportService:
             nombre_archivo=filename,
             tipo_reporte="PDF",
             generado_por_id=user_id,
+            tenant_id=tenant_id,
             ruta_archivo=str(filepath)
         )
         db.add(reporte_db)
@@ -83,11 +87,14 @@ class ReportService:
         return str(filepath)
 
     @classmethod
-    def generate_incidents_excel(cls, db: Session, user_id: int) -> str:
+    def generate_incidents_excel(cls, db: Session, user_id: int, tenant_id: int | None = None) -> str:
         """
         Genera un reporte Excel de los incidentes usando Pandas.
         """
-        incidentes = db.query(Incidente).all()
+        query = db.query(Incidente)
+        if tenant_id is not None:
+            query = query.filter(Incidente.tenant_id == tenant_id)
+        incidentes = query.all()
         
         # Lazy import para evitar errores al iniciar
         try:
@@ -121,6 +128,7 @@ class ReportService:
             nombre_archivo=filename,
             tipo_reporte="EXCEL",
             generado_por_id=user_id,
+            tenant_id=tenant_id,
             ruta_archivo=str(filepath)
         )
         db.add(reporte_db)

@@ -23,7 +23,7 @@ def download_incidents_pdf(
     """
     # En producción esto debería limitarse a admin/operador
     try:
-        file_path = ReportService.generate_incidents_pdf(db, current_user.id)
+        file_path = ReportService.generate_incidents_pdf(db, current_user.id, current_user.tenant_id)
         return FileResponse(
             path=file_path, 
             filename="reporte_incidentes.pdf",
@@ -44,7 +44,7 @@ def download_incidents_excel(
     CU20 — Exportar reporte de incidentes en Excel.
     """
     try:
-        file_path = ReportService.generate_incidents_excel(db, current_user.id)
+        file_path = ReportService.generate_incidents_excel(db, current_user.id, current_user.tenant_id)
         return FileResponse(
             path=file_path,
             filename="reporte_incidentes.xlsx",
@@ -65,4 +65,7 @@ def get_reports_history(
     Lista el historial de reportes generados.
     """
     from app.modules.p6_reportes.models import ReporteGenerado
-    return db.query(ReporteGenerado).order_by(ReporteGenerado.fecha_generacion.desc()).all()
+    query = db.query(ReporteGenerado)
+    if current_user.tenant_id is not None:
+        query = query.filter(ReporteGenerado.tenant_id == current_user.tenant_id)
+    return query.order_by(ReporteGenerado.fecha_generacion.desc()).all()

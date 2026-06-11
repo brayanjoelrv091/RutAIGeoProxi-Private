@@ -12,5 +12,6 @@ class ReporteGenerado(Base):
     nombre_archivo = Column(String, nullable=False)
     tipo_reporte = Column(String, nullable=False)  # 'PDF', 'EXCEL'
     generado_por_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
     fecha_generacion = Column(DateTime, default=datetime.utcnow)
     ruta_archivo = Column(String, nullable=True)

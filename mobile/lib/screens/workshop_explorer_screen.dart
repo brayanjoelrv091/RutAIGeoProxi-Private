@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../modules/workshops/models/workshop_model.dart';
 import '../modules/workshops/services/workshop_service.dart';
+import 'report_incident_screen.dart';
 
 class WorkshopExplorerScreen extends StatefulWidget {
   final bool isSelecting;
@@ -252,12 +253,14 @@ class _WorkshopExplorerScreenState extends State<WorkshopExplorerScreen> {
                   if (widget.isSelecting) {
                     Navigator.pop(context, w);
                   } else {
-                    // TODO: Add to favorites
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Taller seleccionado')));
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => ReportIncidentScreen(preselectedWorkshop: w)),
+                    );
                   }
                 },
                 icon: const Icon(Icons.check_circle, color: Colors.black),
-                label: Text(widget.isSelecting ? 'SELECCIONAR ESTE TALLER' : 'SELECCIONAR COMO FAVORITO', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                label: Text(widget.isSelecting ? 'SELECCIONAR ESTE TALLER' : 'SOLICITAR SERVICIO A ESTE TALLER', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00F2FF),
                   padding: const EdgeInsets.symmetric(vertical: 12),

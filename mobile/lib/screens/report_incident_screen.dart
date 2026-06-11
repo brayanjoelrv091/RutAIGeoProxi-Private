@@ -17,7 +17,8 @@ import 'dart:async';
 import 'workshop_explorer_screen.dart';
 
 class ReportIncidentScreen extends StatefulWidget {
-  const ReportIncidentScreen({super.key});
+  final Workshop? preselectedWorkshop;
+  const ReportIncidentScreen({super.key, this.preselectedWorkshop});
 
   @override
   State<ReportIncidentScreen> createState() => _ReportIncidentScreenState();
@@ -53,6 +54,14 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
   void initState() {
     super.initState();
     _audioRecorder = AudioRecorder();
+    
+    if (widget.preselectedWorkshop != null) {
+      _tipoBusqueda = 'manual';
+      _tallerPreferidoId = widget.preselectedWorkshop!.id;
+      // Añadir temporalmente si no está para mostrar el nombre en el UI
+      _favoritos.add(widget.preselectedWorkshop!);
+    }
+    
     _loadFavorites();
     
     // Iniciar monitoreo offline proactivo

@@ -85,17 +85,22 @@ async def lifespan(_app: FastAPI):
     logger.info("✅ Tablas creadas/verificadas")
 
     # --- PARCHE DE MIGRACIÓN PARA LA TABLA BITACORA ---
-    # Esto asegura que las columnas nuevas existan sin borrar los datos en Render (sin Alembic).
+    # Esto asegura que las columnas nuevas para multi-tenant existan en producción
+    # sin necesidad de Alembic.
     try:
         from sqlalchemy import text
         with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE bitacora ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE;"))
             conn.execute(text("ALTER TABLE bitacora ADD COLUMN IF NOT EXISTS tenant_secuencia INTEGER;"))
             conn.execute(text("ALTER TABLE bitacora ADD COLUMN IF NOT EXISTS codigo_visual VARCHAR(20);"))
+            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS tenant_secuencia INTEGER;"))
+            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS codigo_visual VARCHAR(20);"))
+            conn.execute(text("ALTER TABLE reportes_generados ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE;"))
             conn.commit()
-            logger.info("✅ Parche de columnas en tabla 'bitacora' aplicado exitosamente.")
+            logger.info("✅ Columnas Multi-Tenant (Bitácora, Incidentes, Reportes) verificadas/inyectadas.")
     except Exception as e:
-        logger.warning(f"⚠️ No se pudo aplicar el parche a la tabla 'bitacora': {e}")
+        logger.error(f"Error al inyectar columnas multi-tenant: {e}")
+        # Ignoramos si la BD no lo soporta o si hay un error menor, para no frenar la app
+        pass
     # ----------------------------------------------------
 
     # Firebase Admin SDK es opcional — solo para notificaciones push.

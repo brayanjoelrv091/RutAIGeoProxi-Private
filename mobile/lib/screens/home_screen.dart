@@ -6,6 +6,7 @@ import 'workshop_explorer_screen.dart';
 import 'quotation_detail_screen.dart';
 import 'tenant_dashboard_screen.dart';
 import 'support_chat_screen.dart';
+import 'client_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.onLogout});
@@ -183,6 +184,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (_me!['role'] == 'cliente') ...[
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ClientHistoryScreen()),
+                        );
+                      },
+                      icon: const Icon(Icons.history, color: Colors.black),
+                      label: const Text('🕒 Historial de Mis Servicios', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00E676),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     const Text('Vehículos', style: TextStyle(fontWeight: FontWeight.bold)),
                     ..._vehicles(),
                     const SizedBox(height: 12),

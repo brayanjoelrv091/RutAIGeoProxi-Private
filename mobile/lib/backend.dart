@@ -317,6 +317,17 @@ class Backend {
     return [];
   }
 
+  // --- Incidentes ---
+  static Future<List<dynamic>?> getMyIncidents() async {
+    try {
+      final response = await http.get(_uri('/incidentes/me'), headers: await _headers());
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as List<dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // --- Tracking y Llegada ---
 
   static Future<Map<String, dynamic>?> getIncidentTracking(int incidentId) async {

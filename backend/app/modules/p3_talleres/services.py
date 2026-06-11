@@ -153,6 +153,19 @@ class WorkshopService:
             t.en_linea = WorkshopService._is_online(t)
         return talleres
 
+    @staticmethod
+    def list_tenant_workshops(db: Session, tenant_id: int) -> list[Taller]:
+        """List all workshops for a given tenant, regardless of active status."""
+        talleres = (
+            db.query(Taller)
+            .filter(Taller.tenant_id == tenant_id)
+            .options(joinedload(Taller.tecnicos))
+            .all()
+        )
+        for t in talleres:
+            t.en_linea = WorkshopService._is_online(t)
+        return talleres
+
     # ── FAVORITOS ───────────────────────────────────────────────
 
     @staticmethod

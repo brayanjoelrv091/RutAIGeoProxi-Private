@@ -238,6 +238,19 @@ def list_all_workshops(
     return WorkshopService.list_all(db, search_query=search)
 
 @router.get(
+    "/tenant",
+    response_model=list[WorkshopProfileOut],
+    summary="Listar todos los talleres del tenant (para admins)",
+)
+def list_tenant_workshops(
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(require_roles("admin")),
+):
+    if not current.tenant_id:
+        raise HTTPException(status_code=400, detail="El usuario no tiene un tenant asociado.")
+    return WorkshopService.list_tenant_workshops(db, current.tenant_id)
+
+@router.get(
     "/active",
     response_model=list[WorkshopOut],
     summary="Listar todos los talleres activos del tenant",

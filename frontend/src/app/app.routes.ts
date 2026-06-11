@@ -143,6 +143,11 @@ export const routes: Routes = [
     canActivate: [authGuard, roleGuard('admin')]
   },
   {
+    path: 'tenant/workshops',
+    loadComponent: () => import('./modules/p3_talleres/pages/workshops/tenant-workshops/tenant-workshops.component').then(m => m.TenantWorkshopsComponent),
+    canActivate: [authGuard, roleGuard('admin')]
+  },
+  {
     path: 'superadmin/saas',
     loadComponent: () => import('./modules/p1_usuarios/pages/superadmin-saas/superadmin-saas.component').then(m => m.SuperadminSaasComponent),
     canActivate: [authGuard, roleGuard('admin')]

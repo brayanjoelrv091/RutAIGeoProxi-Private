@@ -90,6 +90,10 @@ export class WorkshopService {
     return this.http.get<Workshop[]>(`${this.base}/workshops`);
   }
 
+  getTenantWorkshops(): Observable<(Workshop & { tecnicos: Technician[] })[]> {
+    return this.http.get<(Workshop & { tecnicos: Technician[] })[]>(`${this.base}/workshops/tenant`);
+  }
+
   listAllWorkshops(): Observable<Workshop[]> {
     return this.http.get<Workshop[]>(`${this.base}/workshops/all`);
   }

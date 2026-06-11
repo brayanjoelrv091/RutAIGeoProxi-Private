@@ -1,0 +1,48 @@
+<div class="glass-card" style="padding: 2rem; max-width: 1000px; margin: 0 auto; color: white;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+    <h2>🏢 Gestión de Mis Talleres</h2>
+    <a routerLink="/workshops/register" class="btn-primary" style="text-decoration: none;">+ Registrar Nueva Sucursal</a>
+  </div>
+
+  @if (loading) {
+    <div style="text-align: center; padding: 2rem;">
+      <p style="color: #00ffff;">Cargando talleres...</p>
+    </div>
+  } @else if (error) {
+    <div style="background-color: rgba(255, 0, 0, 0.1); border: 1px solid red; padding: 1rem; border-radius: 8px;">
+      <p style="color: #ff6b6b; margin: 0;">{{ error }}</p>
+    </div>
+  } @else if (workshops.length === 0) {
+    <div style="text-align: center; padding: 3rem; background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed #333;">
+      <h3 style="color: #888;">No tienes ningún taller registrado.</h3>
+      <p style="color: #666; margin-bottom: 1.5rem;">Comienza añadiendo la primera sucursal para tu plan.</p>
+      <a routerLink="/workshops/register" class="btn-primary" style="text-decoration: none;">Registrar Taller</a>
+    </div>
+  } @else {
+    <div class="workshops-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
+      @for (w of workshops; track w.id) {
+        <div class="workshop-card" style="background: rgba(17, 22, 41, 0.8); border: 1px solid #1f2744; border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column;">
+          
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+            <h3 style="margin: 0; color: #fff; font-size: 1.2rem;">{{ w.nombre }}</h3>
+            <span [style.color]="w.esta_activo ? '#4ade80' : '#ff6b6b'" style="font-size: 0.8rem; padding: 2px 8px; border-radius: 12px; border: 1px solid; background: rgba(0,0,0,0.2);">
+              {{ w.esta_activo ? 'Activo' : 'Inactivo' }}
+            </span>
+          </div>
+
+          <p style="color: #aaa; font-size: 0.9rem; margin: 0 0 0.5rem 0; flex-grow: 1;">📍 {{ w.direccion }}</p>
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #1f2744;">
+            <div style="color: #00ffff; font-size: 0.9rem; font-weight: bold;">
+              👨‍🔧 {{ w.tecnicos?.length || 0 }} Técnico(s)
+            </div>
+            
+            <!-- Future enhancement: Inline edit or detailed view -->
+            <!-- <button style="background: none; border: none; color: #00ffff; cursor: pointer;">Editar</button> -->
+          </div>
+
+        </div>
+      }
+    </div>
+  }
+</div>

@@ -24,15 +24,25 @@ class DashboardService:
         # Las consultas quedan 100% enfocadas en la lógica de negocio.
 
         # 1. Totales y Estados
-        estado_counts = db.query(Incidente.estado, func.count(Incidente.id)).group_by(Incidente.estado).all()
+        estado_query = db.query(Incidente.estado, func.count(Incidente.id))
+        if tenant_id is not None:
+            estado_query = estado_query.filter(Incidente.tenant_id == tenant_id)
+        estado_counts = estado_query.group_by(Incidente.estado).all()
         
         total_incidentes = sum(c for _, c in estado_counts)
         completados = sum(c for est, c in estado_counts if est == "finalizado")
         cancelados = sum(c for est, c in estado_counts if est == "cancelado")
 
         # 2. Distribución (Categorías y Severidad)
-        cat_counts_db = db.query(Incidente.categoria, func.count(Incidente.id)).filter(Incidente.categoria.isnot(None)).group_by(Incidente.categoria).all()
-        sev_counts_db = db.query(Incidente.severidad, func.count(Incidente.id)).filter(Incidente.severidad.isnot(None)).group_by(Incidente.severidad).all()
+        cat_query = db.query(Incidente.categoria, func.count(Incidente.id)).filter(Incidente.categoria.isnot(None))
+        sev_query = db.query(Incidente.severidad, func.count(Incidente.id)).filter(Incidente.severidad.isnot(None))
+        
+        if tenant_id is not None:
+            cat_query = cat_query.filter(Incidente.tenant_id == tenant_id)
+            sev_query = sev_query.filter(Incidente.tenant_id == tenant_id)
+            
+        cat_counts_db = cat_query.group_by(Incidente.categoria).all()
+        sev_counts_db = sev_query.group_by(Incidente.severidad).all()
         
         cat_counts = {c: count for c, count in cat_counts_db}
         sev_counts = {s: count for s, count in sev_counts_db}
@@ -50,7 +60,12 @@ class DashboardService:
         )\
         .outerjoin(Asignacion, Asignacion.incidente_id == Incidente.id)\
         .outerjoin(Usuario, Usuario.id == Asignacion.taller_id)\
-        .outerjoin(Cotizacion, Cotizacion.incidente_id == Incidente.id).all()
+        .outerjoin(Cotizacion, Cotizacion.incidente_id == Incidente.id)
+        
+        if tenant_id is not None:
+            tiempos_query = tiempos_query.filter(Incidente.tenant_id == tenant_id)
+            
+        tiempos_query = tiempos_query.all()
 
         sum_asig_min = 0.0
         count_asig = 0
@@ -100,7 +115,12 @@ class DashboardService:
         # 4. Zonas Calientes
         zonas_query = db.query(
             Incidente.latitud, Incidente.longitud
-        ).filter(Incidente.latitud.isnot(None), Incidente.longitud.isnot(None)).all()
+        ).filter(Incidente.latitud.isnot(None), Incidente.longitud.isnot(None))
+        
+        if tenant_id is not None:
+            zonas_query = zonas_query.filter(Incidente.tenant_id == tenant_id)
+            
+        zonas_query = zonas_query.all()
         
         zonas_dict = {}
         for row in zonas_query:

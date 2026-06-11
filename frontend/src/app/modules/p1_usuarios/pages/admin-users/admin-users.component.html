@@ -34,9 +34,9 @@
             </tr>
           </thead>
           <tbody>
-            @for (user of users; track user.id) {
+            @for (user of users; track user.id; let i = $index) {
               <tr class="table-row">
-                <td class="id-col">#{{ user.id }}</td>
+                <td class="id-col">#{{ i + 1 }}</td>
                 <td>
                   <div class="user-cell">
                     <strong>{{ user.nombre }}</strong>
@@ -77,9 +77,9 @@
             </tr>
           </thead>
           <tbody>
-            @for (log of bitacora; track log.id) {
+            @for (log of bitacora; track log.id; let i = $index) {
               <tr class="table-row">
-                <td class="id-col">#{{ log.id }}</td>
+                <td class="id-col">#{{ bitacora.length - i }}</td>
                 <td>{{ log.creado_en | date:'short' }}</td>
                 <td>
                   <div style="display: flex; flex-direction: column;">

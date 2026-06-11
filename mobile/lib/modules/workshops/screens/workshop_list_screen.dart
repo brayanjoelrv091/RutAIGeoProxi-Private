@@ -348,10 +348,7 @@ class _WorkshopCard extends StatelessWidget {
                       context,
                       MaterialPageRoute(
                         builder: (_) => ReportIncidentScreen(
-                          preselectedWorkshop: {
-                            'id': workshop.id,
-                            'nombre': workshop.nombre,
-                          },
+                          preselectedWorkshop: workshop,
                         ),
                       ),
                     );

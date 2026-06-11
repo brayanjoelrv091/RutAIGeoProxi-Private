@@ -8,6 +8,9 @@ import '../../../core/api_client.dart';
 import '../../assignments/assignment_service.dart';
 import '../../incidents/models/incident_model.dart';
 import '../../incidents/services/incident_service.dart';
+import '../../offline/offline_queue.dart' as oq;
+import '../../offline/sync_manager.dart';
+import 'dart:async';
 
 class MyIncidentsScreen extends StatefulWidget {
   const MyIncidentsScreen({super.key});
@@ -22,11 +25,21 @@ class _MyIncidentsScreenState extends State<MyIncidentsScreen> {
   bool _loading = true;
   String _error = '';
   String _assignMsg = '';
+  StreamSubscription? _syncSub;
 
   @override
   void initState() {
     super.initState();
+    _syncSub = SyncManager().notifications.listen((msg) {
+      if (mounted) _load();
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _syncSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -47,13 +60,34 @@ class _MyIncidentsScreenState extends State<MyIncidentsScreen> {
         } catch (_) {}
       }
 
-      final list = await IncidentService.listMyIncidents();
+      // Load offline incidents
+      final pendingOffline = await oq.OfflineQueue.getPending();
+      final offlineList = pendingOffline.map((item) => Incident(
+        id: -item.idempotencyKey.hashCode,
+        titulo: '${item.titulo} (Offline)',
+        descripcion: item.descripcion,
+        latitud: item.latitud,
+        longitud: item.longitud,
+        direccion: item.direccion,
+        estado: 'pendiente_sync',
+        creadoEn: item.createdAtLocal,
+      )).toList();
+
+      List<Incident> apiList = [];
+      try {
+        apiList = await IncidentService.listMyIncidents();
+      } catch (e) {
+        if (offlineList.isEmpty) rethrow; // Only throw if nothing to show
+      }
+
       setState(() {
         _isAdmin = role == 'admin';
-        _incidents = list;
+        _incidents = [...offlineList, ...apiList];
       });
     } on ApiException catch (e) {
       setState(() => _error = e.message);
+    } catch (e) {
+      setState(() => _error = 'Error de conexión');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -72,6 +106,7 @@ class _MyIncidentsScreenState extends State<MyIncidentsScreen> {
 
   Color _statusColor(String estado) {
     return switch (estado) {
+      'pendiente_sync' => Colors.grey,
       'nuevo' => Colors.orange,
       'clasificado' => Colors.blue,
       'asignado' => Colors.purple,

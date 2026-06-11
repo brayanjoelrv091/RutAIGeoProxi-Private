@@ -14,7 +14,7 @@ import '../../auth/services/auth_service.dart';
 import 'workshop_requests_screen.dart';
 import 'workshop_history_screen.dart';
 import 'workshop_technicians_screen.dart';
-import '../../incidents/screens/report_incident_screen.dart';
+import '../../../screens/report_incident_screen.dart';
 
 class WorkshopListScreen extends StatefulWidget {
   const WorkshopListScreen({super.key});

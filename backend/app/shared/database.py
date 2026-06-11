@@ -67,10 +67,24 @@ def _add_tenant_filter(execute_state):
             # No inyectamos nada para permitir consultas globales necesarias.
             return
 
+        # Función auxiliar para extraer tablas reales de posibles joins
+        def get_tables(from_obj):
+            if hasattr(from_obj, 'original'):
+                yield from get_tables(from_obj.original)
+            elif hasattr(from_obj, 'left') and hasattr(from_obj, 'right'):
+                yield from get_tables(from_obj.left)
+                yield from get_tables(from_obj.right)
+            elif hasattr(from_obj, 'element'):
+                yield from get_tables(from_obj.element)
+            else:
+                yield from_obj
+
         # Manera moderna en SQLAlchemy 2.0 de interceptar e inyectar un criterio:
         statement = execute_state.statement
         if isinstance(statement, Select):
-            for column in statement.get_final_froms():
-                if "tenant_id" in column.columns:
-                    execute_state.statement = statement.where(column.columns.tenant_id == tenant_id)
+            for from_obj in statement.get_final_froms():
+                for table in get_tables(from_obj):
+                    if hasattr(table, 'columns') and "tenant_id" in table.columns:
+                        statement = statement.where(table.columns.tenant_id == tenant_id)
+            execute_state.statement = statement
 

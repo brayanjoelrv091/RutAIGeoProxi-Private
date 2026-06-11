@@ -27,8 +27,22 @@ def get_dashboard(
     current_user: Usuario = Depends(get_current_user),
 ):
     """Obtiene métricas operacionales del tenant actual."""
+    from app.shared.context import current_tenant_id, is_superadmin
+
     # Si es admin y pide un tenant_id específico, lo usamos. Sino usamos el suyo.
     target_tenant = tenant_id if (current_user.rol == "admin" and tenant_id) else current_user.tenant_id
+
+    # Si es un superadmin consultando un tenant en particular, fíngimos el contexto
+    # temporalmente para que el interceptor ORM inyecte el filtro del tenant_id.
+    if current_user.rol == "admin" and current_user.tenant_id is None and tenant_id is not None:
+        token_tenant = current_tenant_id.set(tenant_id)
+        token_admin = is_superadmin.set(False)
+        try:
+            return DashboardService.get_kpis(db, target_tenant)
+        finally:
+            current_tenant_id.reset(token_tenant)
+            is_superadmin.reset(token_admin)
+
     return DashboardService.get_kpis(db, target_tenant)
 
 

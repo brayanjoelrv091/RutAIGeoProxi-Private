@@ -53,6 +53,7 @@ class ClassificationOut(BaseModel):
 
 class IncidentOut(BaseModel):
     id: int
+    codigo_visual: str | None = None
     usuario_id: int
     titulo: str
     descripcion: str | None

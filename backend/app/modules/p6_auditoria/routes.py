@@ -13,6 +13,7 @@ router = APIRouter(prefix="/admin/audit", tags=["P6 · Auditoría"])
 
 class BitacoraOut(BaseModel):
     id: int
+    codigo_visual: str | None = None
     usuario_id: int | None
     usuario_nombre: str | None = None
     usuario_email: str | None = None
@@ -51,6 +52,7 @@ def list_audit_logs(
         user = db.query(Usuario).filter(Usuario.id == b.usuario_id).first() if b.usuario_id else None
         out.append({
             "id": b.id,
+            "codigo_visual": b.codigo_visual,
             "usuario_id": b.usuario_id,
             "usuario_nombre": user.nombre if user else "Sistema",
             "usuario_email": user.email if user else "N/A",

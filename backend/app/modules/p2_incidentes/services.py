@@ -27,6 +27,16 @@ class IncidentService:
     """Servicio de gestión de incidentes vehiculares."""
 
     @staticmethod
+    def _generar_secuencia_incidente(db: Session, incidente: Incidente):
+        from sqlalchemy import func
+        if incidente.tenant_id and incidente.tenant_secuencia is None:
+            max_sec = db.query(func.max(Incidente.tenant_secuencia)).filter(Incidente.tenant_id == incidente.tenant_id).scalar() or 0
+            nueva_sec = int(max_sec) + 1
+            incidente.tenant_secuencia = nueva_sec
+            incidente.codigo_visual = f"INC-{nueva_sec:04d}"
+
+
+    @staticmethod
     async def create(
         db: Session,
         user_id: int,
@@ -93,6 +103,7 @@ class IncidentService:
                 idempotency_key=sync_hash,
                 creado_en_local=dt_local,
             )
+            IncidentService._generar_secuencia_incidente(db, incidente)
             db.add(incidente)
 
         db.flush()  # Obtener ID sin commit o actualizar BD
@@ -561,6 +572,7 @@ class IncidentService:
         # 1. Transferencia de propiedad (Tenant)
         incidente.estado = "taller_asignado"
         incidente.tenant_id = taller.tenant_id
+        IncidentService._generar_secuencia_incidente(db, incidente)
         db.commit()
         db.refresh(incidente)
         

@@ -332,7 +332,7 @@ class Backend {
 
   static Future<Map<String, dynamic>?> getIncidentTracking(int incidentId) async {
     try {
-      final response = await http.get(_uri('/incidentes/$incidentId/tracking'), headers: await _headers());
+      final response = await http.get(_uri('/incidents/$incidentId/tracking'), headers: await _headers());
       if (response.statusCode == 200) return jsonDecode(response.body);
     } catch (_) {}
     return null;
@@ -340,7 +340,7 @@ class Backend {
 
   static Future<bool> reportArrival(int incidentId) async {
     try {
-      final response = await http.post(_uri('/incidentes/$incidentId/llegada-taller'), headers: await _headers());
+      final response = await http.post(_uri('/incidents/$incidentId/llegada-taller'), headers: await _headers());
       return response.statusCode == 200;
     } catch (_) {}
     return false;

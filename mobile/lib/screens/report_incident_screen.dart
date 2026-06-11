@@ -294,18 +294,16 @@ class _ReportIncidentScreenState extends State<ReportIncidentScreen> {
           );
           Navigator.pop(context);
         } else {
-          // If error is network related, fallback to offline
-          if (res.toLowerCase().contains('socket') || res.toLowerCase().contains('timeout') || res.toLowerCase().contains('conexión')) {
-            await _saveToOfflineQueue();
-          } else {
-            setState(() => _error = res);
-          }
+          setState(() => _error = res);
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
-        await _saveToOfflineQueue();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        );
+        setState(() => _error = "Excepción: $e");
       }
     }
   }

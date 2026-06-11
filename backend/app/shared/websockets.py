@@ -19,8 +19,11 @@ class ConnectionManager:
                 # Limpiar memoria si la sala queda vacía
                 del self.active_connections[room_id]
 
-    async def send_personal_message(self, message: dict, websocket: WebSocket):
-        await websocket.send_json(message)
+    async def send_personal_message(self, message: dict, target):
+        if isinstance(target, str):
+            await self.broadcast_to_room(message, target)
+        else:
+            await target.send_json(message)
 
     async def broadcast_to_room(self, message: dict, room_id: str):
         if room_id in self.active_connections:

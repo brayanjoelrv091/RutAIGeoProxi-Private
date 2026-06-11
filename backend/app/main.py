@@ -166,6 +166,7 @@ app.add_middleware(
 )
 
 from fastapi.responses import JSONResponse
+from fastapi import Request
 import traceback
 
 @app.exception_handler(Exception)

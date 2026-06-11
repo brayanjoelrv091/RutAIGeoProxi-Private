@@ -165,6 +165,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi.responses import JSONResponse
+import traceback
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    error_msg = f"{type(exc).__name__}: {str(exc)}"
+    tb = traceback.format_exc()
+    logger.error(f"Global 500 en {request.url}: {error_msg}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"INTERNAL_ERROR: {error_msg}\nTRACE:\n{tb}"}
+    )
+
+
 
 # ── Security & Cache Headers ──
 from starlette.middleware.base import BaseHTTPMiddleware

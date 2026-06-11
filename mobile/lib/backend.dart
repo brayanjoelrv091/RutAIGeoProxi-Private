@@ -320,7 +320,7 @@ class Backend {
   // --- Incidentes ---
   static Future<List<dynamic>?> getMyIncidents() async {
     try {
-      final response = await http.get(_uri('/incidentes/me'), headers: await _headers());
+      final response = await http.get(_uri('/incidents'), headers: await _headers());
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as List<dynamic>;
       }

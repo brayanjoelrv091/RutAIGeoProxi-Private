@@ -14,7 +14,7 @@ import '../../auth/services/auth_service.dart';
 import 'workshop_requests_screen.dart';
 import 'workshop_history_screen.dart';
 import 'workshop_technicians_screen.dart';
-import 'register_workshop_screen.dart';
+import '../../incidents/screens/report_incident_screen.dart';
 
 class WorkshopListScreen extends StatefulWidget {
   const WorkshopListScreen({super.key});
@@ -107,16 +107,7 @@ class _WorkshopListScreenState extends State<WorkshopListScreen> with SingleTick
           ),
         ],
       ),
-      floatingActionButton: _role == 'cliente' ? null : FloatingActionButton.extended(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const RegisterWorkshopScreen()),
-        ).then((_) => _load()),
-        backgroundColor: const Color(0xFF0096FF),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_business),
-        label: const Text('Registrar', style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
+      floatingActionButton: null,
       body: _role == 'cliente' && _tabController != null
           ? TabBarView(
               controller: _tabController!,
@@ -347,6 +338,31 @@ class _WorkshopCard extends StatelessWidget {
                   icon: const Icon(Icons.history, size: 16),
                   label: const Text('Historial', style: TextStyle(fontSize: 12)),
                   style: TextButton.styleFrom(foregroundColor: Colors.white54),
+                ),
+              ),
+              const VerticalDivider(color: Colors.white12, width: 1),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ReportIncidentScreen(
+                          preselectedWorkshop: {
+                            'id': workshop.id,
+                            'nombre': workshop.nombre,
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.car_crash, size: 16),
+                  label: const Text('Solicitar Servicio', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00E676),
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
                 ),
               ),
             ],

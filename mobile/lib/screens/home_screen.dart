@@ -166,22 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      // Usamos ID=1 como prueba para la cotización
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const QuotationDetailScreen(incidentId: 1)),
-                      );
-                    },
-                    icon: const Icon(Icons.request_quote, color: Colors.black),
-                    label: const Text('📄 Ver Cotización de Prueba (CU-30/32)', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFB74D),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
+
                   const SizedBox(height: 16),
                   if (_me!['role'] == 'cliente') ...[
                     ElevatedButton.icon(

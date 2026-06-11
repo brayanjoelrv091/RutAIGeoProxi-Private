@@ -213,9 +213,22 @@ class IncidentService:
             }
             
             for t in talleres_tenant:
+                from app.modules.p3_talleres.models import SolicitudServicio
+                # Crear Solicitud de Servicio (broadcast a todos los talleres)
+                solicitud = SolicitudServicio(
+                    incidente_id=incidente.id,
+                    taller_id=t.id,
+                    estado="pendiente",
+                    notas="Incidente reportado, esperando aceptación de un taller."
+                )
+                db.add(solicitud)
+                
                 # Transmisión inmediata vía WebSocket (sin DB, 100% en vivo)
                 await manager.send_personal_message(ws_payload, str(t.usuario_propietario_id))
                 
+            db.commit() # Guardar las solicitudes generadas
+
+            for t in talleres_tenant:
                 # Push Notification y Notificación DB segura en background
                 background_tasks.add_task(
                     NotificationService.send_push_notification_safe,

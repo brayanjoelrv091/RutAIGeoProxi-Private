@@ -9,6 +9,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.sql import func
 
 from app.shared.database import Base
+from app.modules.p7_seguridad_multitenant.models import Tenant  # Fix para NoReferencedTableError
 
 
 class Bitacora(Base):

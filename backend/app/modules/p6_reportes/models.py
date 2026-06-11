@@ -1,6 +1,7 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from app.shared.database import Base
+from app.modules.p7_seguridad_multitenant.models import Tenant  # Fix para NoReferencedTableError
 
 class ReporteGenerado(Base):
     """

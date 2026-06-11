@@ -12,6 +12,7 @@ from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, Str
 from sqlalchemy.orm import relationship
 
 from app.shared.database import Base
+from app.modules.p7_seguridad_multitenant.models import Tenant  # Fix para NoReferencedTableError
 from app.modules.p3_talleres.models import usuarios_talleres_favoritos
 
 

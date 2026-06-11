@@ -33,9 +33,16 @@ export class AppComponent implements OnInit {
     this.isDarkTheme = localStorage.getItem('theme') !== 'light';
     this.applyTheme();
     if (this.isLoggedIn()) {
+      this.requestNotificationPermission();
       this.fetchNotifications();
       this.initNotifications();
       this.checkSuperadmin();
+    }
+  }
+
+  requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
     }
   }
 
@@ -106,12 +113,13 @@ export class AppComponent implements OnInit {
             this.notifications.unshift(notif);
             this.unreadCount++;
             
-            // 🔔 EXPERIENCIA YANGO: Sonido + Popup
+            // 🔔 EXPERIENCIA YANGO: Sonido + Popup + Notificación Nativa
             const msg = (notif.mensaje || notif.message || '').toLowerCase();
             const titulo = (notif.titulo || notif.title || '').toLowerCase();
             
-            if (titulo.includes('asignación') || msg.includes('emergencia') || msg.includes('asignado')) {
+            if (notif.type === 'nuevo_incidente' || titulo.includes('asignación') || titulo.includes('incidente') || msg.includes('emergencia') || msg.includes('asignado')) {
               this.playAlertSound();
+              this.showNativeNotification(notif.titulo || notif.title || 'Alerta', notif.mensaje || notif.message || 'Nueva emergencia detectada');
               this.yangoModalActive = true;
               
               // Extraer ID si viene en el texto (ej: incidente #42)
@@ -123,6 +131,21 @@ export class AppComponent implements OnInit {
       } catch (e) {
         console.error('Error parsing token for notifications', e);
       }
+    }
+  }
+
+  showNativeNotification(title: string, body: string) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const notification = new Notification(title, {
+        body: body,
+        icon: '/assets/logo.png', // Fallback opcional si tienes un icono
+        requireInteraction: true // Mantiene la notificación visible hasta que interactúen
+      });
+      
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
     }
   }
 

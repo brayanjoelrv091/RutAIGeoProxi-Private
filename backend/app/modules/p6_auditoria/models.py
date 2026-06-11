@@ -18,7 +18,6 @@ class Bitacora(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(Integer, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
-    tenant_secuencia = Column(Integer, nullable=True)
     codigo_visual = Column(String(20), nullable=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=True, index=True) # Puede ser nulo si el usuario fue borrado o no estaba logueado
     rol = Column(String(20), nullable=True)

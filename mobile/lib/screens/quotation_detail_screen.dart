@@ -34,7 +34,7 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
       // Por ahora probaremos a hacer un fetch simulado o un HTTP call real.
       
       final response = await http.get(
-        Uri.parse('${AppConfig.baseUrl}/incidents/${widget.incidentId}'),
+        Uri.parse('${AppConfig.baseUrl}/analytics/quotations/${widget.incidentId}'),
         headers: {
           'Content-Type': 'application/json',
           if (token != null) 'Authorization': 'Bearer $token',
@@ -43,25 +43,19 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        // El incidente debe incluir la cotización si el backend la anidó, o usamos datos mockeados para esta UI si no está.
         setState(() {
-          _quotation = {
-            'id': 1,
-            'subtotal': 100.00,
-            'iva': 16.00,
-            'total': 116.00,
-            'estado': 'enviada',
-            'tiempo_estimado_dias': 2,
-            'notas': 'Cotización basada en el análisis de IA de la fotografía enviada.',
-          };
-          _items = [
-            {'descripcion': 'Cambio de parachoques', 'cantidad': 1, 'precio_unitario': 50.00},
-            {'descripcion': 'Pintura y mano de obra', 'cantidad': 1, 'precio_unitario': 50.00},
-          ];
+          _quotation = data;
+          _items = data['items'] ?? [];
+          _isLoading = false;
+        });
+      } else if (response.statusCode == 404) {
+        // No hay cotización, inicializar en vacío
+        setState(() {
+          _quotation = null;
           _isLoading = false;
         });
       } else {
-        throw Exception('No se pudo cargar la cotización');
+        throw Exception('Error al cargar la cotización (${response.statusCode})');
       }
     } catch (e) {
       setState(() {
@@ -108,7 +102,33 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF00F2FF)))
           : _error != null
               ? Center(child: Text(_error!, style: const TextStyle(color: Colors.redAccent)))
-              : _buildContent(),
+              : _quotation == null
+                  ? _buildEmptyState()
+                  : _buildContent(),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.request_quote_outlined, size: 80, color: Colors.white24),
+            const SizedBox(height: 24),
+            const Text('Sin Cotización', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            const Text('Aún no se ha emitido ninguna cotización para este incidente. Total a pagar actual: 0.00 Bs.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 16)),
+            const SizedBox(height: 40),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00F2FF), foregroundColor: Colors.black),
+              child: const Text('VOLVER AL HISTORIAL'),
+            )
+          ],
+        ),
+      ),
     );
   }
 

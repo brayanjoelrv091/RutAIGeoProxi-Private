@@ -85,21 +85,16 @@ async def lifespan(_app: FastAPI):
     logger.info("✅ Tablas creadas/verificadas")
 
     # --- PARCHE DE MIGRACIÓN PARA LA TABLA BITACORA ---
-    # Esto asegura que las columnas nuevas para multi-tenant existan en producción
-    # sin necesidad de Alembic.
+    # Removido porque generaba fallos de UndefinedColumn en PostgreSQL al estar sin Isolation Level 
+    # autocommit explícito y ya no se usa tenant_secuencia.
     try:
         from sqlalchemy import text
         with engine.connect() as conn:
-            conn.execute(text("ALTER TABLE bitacora ADD COLUMN IF NOT EXISTS tenant_secuencia INTEGER;"))
-            conn.execute(text("ALTER TABLE bitacora ADD COLUMN IF NOT EXISTS codigo_visual VARCHAR(20);"))
-            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS tenant_secuencia INTEGER;"))
-            conn.execute(text("ALTER TABLE incidentes ADD COLUMN IF NOT EXISTS codigo_visual VARCHAR(20);"))
             conn.execute(text("ALTER TABLE reportes_generados ADD COLUMN IF NOT EXISTS tenant_id INTEGER REFERENCES tenants(id) ON DELETE CASCADE;"))
             conn.commit()
-            logger.info("✅ Columnas Multi-Tenant (Bitácora, Incidentes, Reportes) verificadas/inyectadas.")
+            logger.info("✅ Columna tenant_id inyectada en reportes.")
     except Exception as e:
         logger.error(f"Error al inyectar columnas multi-tenant: {e}")
-        # Ignoramos si la BD no lo soporta o si hay un error menor, para no frenar la app
         pass
     # ----------------------------------------------------
 

@@ -63,7 +63,6 @@ class Incidente(Base):
     taller_longitud = Column(Float, nullable=True)
     tiempo_llegada_estimado_minutos = Column(Integer, nullable=True)
     
-    tenant_secuencia = Column(Integer, nullable=True)
     codigo_visual = Column(String(20), nullable=True, index=True)
 
     tiempo_estimado_reparacion_minutos = Column(Integer, nullable=True) # CU-32: ETA dinámico

@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
-import '../backend.dart';
-import '../modules/payments/screens/payment_history_screen.dart';
-import 'quotation_detail_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../../../config.dart';
+import '../../../session.dart';
 
-class ClientHistoryScreen extends StatefulWidget {
-  const ClientHistoryScreen({super.key});
+class PaymentHistoryScreen extends StatefulWidget {
+  const PaymentHistoryScreen({super.key});
 
   @override
-  State<ClientHistoryScreen> createState() => _ClientHistoryScreenState();
+  State<PaymentHistoryScreen> createState() => _PaymentHistoryScreenState();
 }
 
-class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
+class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
   bool _loading = true;
-  List<dynamic> _incidents = [];
+  List<dynamic> _payments = [];
   String? _error;
 
   @override
@@ -24,17 +25,29 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
 
   Future<void> _loadHistory() async {
     try {
-      final data = await Backend.getMyIncidents(); // Asumimos que Backend tiene este método
-      if (mounted) {
-        setState(() {
-          _incidents = data ?? [];
-          _loading = false;
-        });
+      final token = await Session.getToken();
+      final response = await http.get(
+        Uri.parse('${AppConfig.baseUrl}/payments/history'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          setState(() {
+            _payments = jsonDecode(response.body) ?? [];
+            _loading = false;
+          });
+        }
+      } else {
+        throw Exception('Error al cargar historial (${response.statusCode})');
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'Error al cargar el historial: $e';
+          _error = 'Error: $e';
           _loading = false;
         });
       }
@@ -46,38 +59,31 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E1A),
       appBar: AppBar(
-        title: const Text('Historial de Servicios'),
+        title: const Text('Historial de Pagos'),
         backgroundColor: const Color(0xFF111629),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.receipt_long, color: Color(0xFF00F2FF)),
-            tooltip: 'Historial de Pagos',
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentHistoryScreen()));
-            },
-          )
-        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF00F2FF)))
           : _error != null
               ? Center(child: Text(_error!, style: const TextStyle(color: Colors.redAccent)))
-              : _incidents.isEmpty
-                  ? const Center(child: Text('Aún no tienes servicios en tu historial.', style: TextStyle(color: Colors.white70)))
+              : _payments.isEmpty
+                  ? const Center(child: Text('Aún no tienes pagos registrados.', style: TextStyle(color: Colors.white70)))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _incidents.length,
+                      itemCount: _payments.length,
                       itemBuilder: (context, index) {
-                        final inc = _incidents[index];
-                        final fechaStr = inc['creado_en'] ?? '';
+                        final p = _payments[index];
+                        final fechaStr = p['creado_at'] ?? '';
                         String fechaFormateada = fechaStr;
                         try {
                           final date = DateTime.parse(fechaStr);
                           fechaFormateada = DateFormat('dd MMM yyyy, HH:mm').format(date);
                         } catch (_) {}
 
-                        final estado = inc['estado'] ?? 'desconocido';
-                        final colorEstado = estado == 'finalizado' ? const Color(0xFF00E676) : (estado == 'cancelado' ? Colors.redAccent : Colors.orangeAccent);
+                        final estado = p['estado'] ?? 'desconocido';
+                        final colorEstado = estado == 'completado' || estado == 'pagado'
+                            ? const Color(0xFF00E676)
+                            : Colors.orangeAccent;
 
                         return Card(
                           color: const Color(0xFF111629),
@@ -96,7 +102,7 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        inc['titulo'] ?? 'Sin título',
+                                        'Incidente #${p['incidente_id'] ?? '-'}',
                                         style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                                       ),
                                     ),
@@ -114,37 +120,18 @@ class _ClientHistoryScreenState extends State<ClientHistoryScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Text('ID: ${inc['codigo_visual'] ?? inc['id']}', style: const TextStyle(color: Colors.white54, fontSize: 13)),
+                                Text('Método: ${p['metodo_pago']?.toString().toUpperCase() ?? 'DESCONOCIDO'}', style: const TextStyle(color: Colors.white54, fontSize: 13)),
                                 Text('Fecha: $fechaFormateada', style: const TextStyle(color: Colors.white54, fontSize: 13)),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 12),
                                 Row(
                                   children: [
-                                    const Icon(Icons.build_circle, color: Color(0xFF00F2FF), size: 16),
+                                    const Icon(Icons.attach_money, color: Color(0xFF00F2FF), size: 16),
                                     const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        inc['taller_id'] != null ? 'Taller Asignado (ID: ${inc['taller_id']})' : 'Taller no asignado o pendiente',
-                                        style: const TextStyle(color: Color(0xFF00F2FF), fontSize: 13),
-                                      ),
+                                    Text(
+                                      'Monto: ${p['monto']} ${p['moneda'] ?? 'USD'}',
+                                      style: const TextStyle(color: Color(0xFF00F2FF), fontSize: 15, fontWeight: FontWeight.bold),
                                     ),
                                   ],
-                                ),
-                                const SizedBox(height: 12),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(context, MaterialPageRoute(
-                                        builder: (_) => QuotationDetailScreen(incidentId: inc['id'])
-                                      ));
-                                    },
-                                    icon: const Icon(Icons.request_quote, size: 16),
-                                    label: const Text('Ver Cotización y Pago'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: const Color(0xFF00F2FF),
-                                      side: const BorderSide(color: Color(0xFF00F2FF)),
-                                    ),
-                                  ),
                                 )
                               ],
                             ),

@@ -28,12 +28,9 @@ class IncidentService:
 
     @staticmethod
     def _generar_secuencia_incidente(db: Session, incidente: Incidente):
-        from sqlalchemy import func
-        if incidente.tenant_id and incidente.tenant_secuencia is None:
-            max_sec = db.query(func.max(Incidente.tenant_secuencia)).filter(Incidente.tenant_id == incidente.tenant_id).scalar() or 0
-            nueva_sec = int(max_sec) + 1
-            incidente.tenant_secuencia = nueva_sec
-            incidente.codigo_visual = f"INC-{nueva_sec:04d}"
+        """Asigna el codigo_visual usando el ID propio de la DB (post-flush)"""
+        if incidente.id:
+            incidente.codigo_visual = f"INC-{incidente.id:04d}"
 
 
     @staticmethod
@@ -103,10 +100,14 @@ class IncidentService:
                 idempotency_key=sync_hash,
                 creado_en_local=dt_local,
             )
-            IncidentService._generar_secuencia_incidente(db, incidente)
             db.add(incidente)
 
         db.flush()  # Obtener ID sin commit o actualizar BD
+        
+        # 1.1 Asignar código visual
+        if not incidente.codigo_visual:
+            IncidentService._generar_secuencia_incidente(db, incidente)
+            db.flush()
 
         # 2. Subir fotos
         image_local_paths: list[str] = []

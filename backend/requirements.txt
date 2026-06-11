@@ -13,7 +13,7 @@ passlib[bcrypt]>=1.7.4
 bcrypt>=4.0.1,<5.0.0
 email-validator>=2.0.0
 websockets>=12.0
-httpx>=0.27.0
+httpx
 
 # ── Base de Datos ──
 SQLAlchemy>=2.0.0

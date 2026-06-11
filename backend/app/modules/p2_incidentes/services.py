@@ -196,14 +196,19 @@ class IncidentService:
             accion=f"Reporte de incidente #{incidente.id} ({incidente.categoria})"
         )
 
-        # Enviar Notificación Push y WS a todos los talleres del tenant
-        if tenant_id and background_tasks:
+        # Enviar Notificación Push y WS a los talleres
+        if background_tasks:
             from app.modules.p3_talleres.models import Taller
             from app.modules.p5_pagos.services import NotificationService
             from app.shared.websockets import manager
             import asyncio
             
-            talleres_tenant = db.query(Taller).filter(Taller.tenant_id == tenant_id, Taller.esta_activo == True).all()
+            # Si el cliente tiene tenant_id, filtramos por él, si no, tomamos todos los activos (o cercanos)
+            if tenant_id:
+                talleres_tenant = db.query(Taller).filter(Taller.tenant_id == tenant_id, Taller.esta_activo == True).all()
+            else:
+                # Cliente global: Mandar broadcast a TODOS los talleres activos (en una versión futura usar radio geo)
+                talleres_tenant = db.query(Taller).filter(Taller.esta_activo == True).all()
             
             ws_payload = {
                 "type": "nuevo_incidente",

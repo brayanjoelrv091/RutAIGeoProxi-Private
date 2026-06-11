@@ -468,15 +468,32 @@ class WorkshopService:
 
         # CU16 - Notificar al cliente dueño del incidente
         from app.modules.p5_pagos.services import NotificationService
+        from app.shared.websockets import manager
+        import asyncio
+
         incidente = db.query(Incidente).filter(Incidente.id == solicitud.incidente_id).first()
-        if incidente and background_tasks:
-            background_tasks.add_task(
-                NotificationService.send_push_notification,
-                db=db,
-                user_id=incidente.usuario_id,
-                titulo="Actualización de Servicio",
-                mensaje=f"Tu incidente ha cambiado al estado: {payload.estado.upper()}"
-            )
+        if incidente:
+            ws_payload = {
+                "type": "estado_servicio_actualizado",
+                "incidente_id": incidente.id,
+                "nuevo_estado": payload.estado,
+                "titulo": "Actualización de Servicio",
+                "mensaje": f"Tu incidente ha cambiado al estado: {payload.estado.upper()}"
+            }
+            # Enviar WS directo
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(manager.send_personal_message(ws_payload, str(incidente.usuario_id)))
+            except RuntimeError:
+                asyncio.run(manager.send_personal_message(ws_payload, str(incidente.usuario_id)))
+
+            if background_tasks:
+                background_tasks.add_task(
+                    NotificationService.send_push_notification_safe,
+                    user_id=incidente.usuario_id,
+                    titulo="Actualización de Servicio",
+                    mensaje=f"Tu incidente ha cambiado al estado: {payload.estado.upper()}"
+                )
 
         return solicitud
 

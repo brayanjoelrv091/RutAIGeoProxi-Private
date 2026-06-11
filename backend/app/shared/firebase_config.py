@@ -47,6 +47,17 @@ def send_push_notification(fcm_token: str, title: str, body: str, data: dict = N
                 title=title,
                 body=body,
             ),
+            android=messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    sound='default'
+                )
+            ),
+            apns=messaging.APNSConfig(
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(sound='default')
+                )
+            ),
             data=data or {},
             token=fcm_token,
         )

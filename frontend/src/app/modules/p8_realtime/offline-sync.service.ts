@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, fromEvent, merge } from 'rxjs';
 import { map, distinctUntilChanged } from 'rxjs/operators';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { environment } from '../../../environment';
+import { environment } from '../../environment';
 
 /**
  * P8 · CU-21/22/23 — Servicio de sincronización offline (PWA).

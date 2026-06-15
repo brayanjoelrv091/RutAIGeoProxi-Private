@@ -1,7 +1,7 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { WorkshopService, Workshop, Technician } from '../../../../services/workshop.service';
+import { WorkshopService, Workshop, Technician } from '../../../workshop.service';
 
 @Component({
   selector: 'app-tenant-workshops',
@@ -23,11 +23,11 @@ export class TenantWorkshopsComponent implements OnInit {
   loadWorkshops() {
     this.loading = true;
     this.workshopService.getTenantWorkshops().subscribe({
-      next: (data) => {
+      next: (data: (Workshop & { tecnicos: Technician[] })[]) => {
         this.workshops = data;
         this.loading = false;
       },
-      error: (err) => {
+      error: (err: unknown) => {
         console.error(err);
         this.error = 'Error al cargar los talleres. Por favor intenta de nuevo.';
         this.loading = false;

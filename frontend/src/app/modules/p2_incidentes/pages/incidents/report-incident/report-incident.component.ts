@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { IncidentService } from '../../../incident.service';
-import { OfflineSyncService } from '../../../p8_realtime/offline-sync.service';
+import { OfflineSyncService } from '../../../../p8_realtime/offline-sync.service';
 
 @Component({
   selector: 'app-report-incident',

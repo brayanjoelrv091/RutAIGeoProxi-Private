@@ -45,7 +45,7 @@ class OfflineSyncService:
     """
 
     @staticmethod
-    def sync_batch(
+    async def sync_batch(
         db: Session,
         user_id: int,
         items: list[OfflineIncidentPayload],
@@ -65,7 +65,7 @@ class OfflineSyncService:
 
         for item in items:
             try:
-                result = OfflineSyncService._process_item(db, user_id, item)
+                result = await OfflineSyncService._process_item(db, user_id, item)
                 results.append(result)
 
                 if result.status == SyncStatus.CREATED:
@@ -98,7 +98,7 @@ class OfflineSyncService:
         )
 
     @staticmethod
-    def _process_item(
+    async def _process_item(
         db: Session,
         user_id: int,
         item: OfflineIncidentPayload,
@@ -155,6 +155,42 @@ class OfflineSyncService:
             f"Incidente creado desde offline: id={incidente.id}, "
             f"key={item.idempotency_key}"
         )
+
+        # ── Notificar a los talleres (Simulando push/WS) ──
+        try:
+            from app.modules.p3_talleres.models import Taller, SolicitudServicio
+            from app.shared.websockets import manager
+            from app.modules.p1_usuarios.models import Usuario
+
+            # Buscar tenant del cliente
+            client = db.query(Usuario).filter(Usuario.id == user_id).first()
+            tenant_id = client.tenant_id if client else None
+
+            if tenant_id:
+                talleres = db.query(Taller).filter(Taller.tenant_id == tenant_id, Taller.esta_activo == True).all()
+            else:
+                talleres = db.query(Taller).filter(Taller.esta_activo == True).all()
+
+            ws_payload = {
+                "type": "nuevo_incidente",
+                "incidente_id": incidente.id,
+                "titulo": "¡Nuevo Incidente Reportado (Offline Sync)!",
+                "mensaje": f"Un cliente necesita asistencia: {incidente.titulo}"
+            }
+
+            for t in talleres:
+                solicitud = SolicitudServicio(
+                    incidente_id=incidente.id,
+                    taller_id=t.id,
+                    estado="pendiente",
+                    notas="Incidente sincronizado, esperando aceptación."
+                )
+                db.add(solicitud)
+                await manager.send_personal_message(ws_payload, str(t.usuario_propietario_id))
+            
+            db.commit()
+        except Exception as notify_err:
+            logger.error(f"Error notificando a talleres sobre incidente offline {incidente.id}: {notify_err}")
 
         return OfflineSyncItemResult(
             idempotency_key=item.idempotency_key,

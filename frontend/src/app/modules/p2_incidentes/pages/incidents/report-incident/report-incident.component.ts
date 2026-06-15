@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { IncidentService } from '../../../incident.service';
+import { OfflineSyncService } from '../../../p8_realtime/offline-sync.service';
 
 @Component({
   selector: 'app-report-incident',
@@ -12,6 +13,7 @@ import { IncidentService } from '../../../incident.service';
 })
 export class ReportIncidentComponent {
   private readonly incidentSvc = inject(IncidentService);
+  private readonly offlineSyncSvc = inject(OfflineSyncService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
 
@@ -66,13 +68,32 @@ export class ReportIncidentComponent {
     }
   }
 
-  submit(): void {
+  async submit(): Promise<void> {
     if (this.form.invalid) return;
     this.loading = true;
     this.error = '';
     this.success = '';
 
     const v = this.form.getRawValue();
+
+    if (!navigator.onLine) {
+      // Offline mode
+      const key = this.offlineSyncSvc.generateKey();
+      await this.offlineSyncSvc.queueIncident({
+        idempotency_key: key,
+        titulo: v.titulo,
+        descripcion: v.descripcion || undefined,
+        latitud: v.latitud,
+        longitud: v.longitud,
+        direccion: v.direccion || undefined,
+      });
+      
+      this.success = `Guardado sin conexión. Se enviará automáticamente cuando recuperes la señal.`;
+      this.loading = false;
+      setTimeout(() => void this.router.navigate(['/dashboard']), 2000);
+      return;
+    }
+
     this.incidentSvc
       .reportIncident(
         {

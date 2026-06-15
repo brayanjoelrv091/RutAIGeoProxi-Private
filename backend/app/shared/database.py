@@ -51,7 +51,7 @@ from sqlalchemy.sql import Select
 @event.listens_for(Session, "do_orm_execute")
 def _add_tenant_filter(execute_state):
     """
-    Intercepta cada consulta enviada por SQLAlchemy. Si el modelo destino
+    Intercepta cada consulta enviada por postegre. Si el modelo destino
     tiene la columna 'tenant_id' y el usuario no es un SuperAdmin Global,
     inyecta automáticamente un filtro `.filter(tenant_id == X)`.
     """

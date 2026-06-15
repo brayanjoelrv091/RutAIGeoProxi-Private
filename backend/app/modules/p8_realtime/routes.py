@@ -69,7 +69,7 @@ router = APIRouter(
     status_code=status.HTTP_200_OK,
     summary="CU-21/22/23 · Sincronizar cola de incidentes offline",
 )
-def sync_offline_incidents(
+async def sync_offline_incidents(
     request: OfflineSyncRequest,
     db: Session = Depends(get_db),
     current: Usuario = Depends(get_current_user),
@@ -80,7 +80,7 @@ def sync_offline_incidents(
     Cada ítem incluye un `idempotency_key` para evitar duplicados.
     Los ítems duplicados se reportan con status 'duplicate' pero no causan error.
     """
-    return OfflineSyncService.sync_batch(
+    return await OfflineSyncService.sync_batch(
         db=db,
         user_id=current.id,
         items=request.items,

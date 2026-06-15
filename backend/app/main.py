@@ -257,6 +257,18 @@ app.include_router(analytics_router)
 # @app.get("/api/v1/patch-saas-db", tags=["Mantenimiento"])
 # def patch_saas_db(): ...
 
+@app.get("/api/v1/seed-dashboard/{tenant_id}")
+def seed_dashboard_endpoint(tenant_id: int):
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from seed_dashboard import seed_dashboard
+        seed_dashboard(tenant_id)
+        return {"message": f"Dashboard sembrado correctamente para el tenant {tenant_id}"}
+    except Exception as e:
+        return {"error": str(e)}
+
 # @app.get("/api/v1/test-email", tags=["Mantenimiento"])
 # def test_email(...): ...
 

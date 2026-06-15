@@ -64,6 +64,7 @@ class _MyIncidentsScreenState extends State<MyIncidentsScreen> {
       final pendingOffline = await oq.OfflineQueue.getPending();
       final offlineList = pendingOffline.map((item) => Incident(
         id: -item.idempotencyKey.hashCode,
+        usuarioId: 0, // Dummy value for offline display
         titulo: '${item.titulo} (Offline)',
         descripcion: item.descripcion,
         latitud: item.latitud,

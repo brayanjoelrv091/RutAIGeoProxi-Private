@@ -3,8 +3,8 @@ import { CommonModule } from '@angular/common';
 import { AnalyticsService, DashboardKPIs } from '../../services/analytics.service';
 import { ChartConfiguration, ChartData, ChartType } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
-import { AuthService } from '../../p1_usuarios/auth.service';
-import { WebSocketService } from '../../shared/websocket.service';
+import { AuthService } from '../../../p1_usuarios/auth.service';
+import { WebSocketService } from '../../../shared/websocket.service';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -64,7 +64,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const userId = parseInt(payload.sub, 10);
         if (userId) {
-          this.wsSubscription = this.ws.connectNotifications(userId).subscribe((notif) => {
+          this.wsSubscription = this.ws.connectNotifications(userId).subscribe((notif: any) => {
             // Actualizar dashboard inmediatamente si hay un cambio relevante
             if (notif.type === 'nuevo_incidente' || notif.type === 'ESTADO_UPDATED' || (notif.titulo && notif.titulo.toLowerCase().includes('incidente'))) {
               this.loadData();

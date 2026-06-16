@@ -681,3 +681,4 @@ class IncidentService:
 
         return {"status": "ok", "incidente_id": incidente.id, "estado": incidente.estado}
 
+

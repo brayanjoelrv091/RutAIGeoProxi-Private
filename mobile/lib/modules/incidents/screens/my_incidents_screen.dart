@@ -140,7 +140,13 @@ class _MyIncidentsScreenState extends State<MyIncidentsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh, color: Color(0xFF00F2FF)),
-            onPressed: _load,
+            onPressed: () async {
+              final token = await ApiClient.getToken();
+              if (token != null) {
+                await SyncManager().syncNow(token);
+              }
+              _load();
+            },
           ),
         ],
       ),
@@ -202,11 +208,19 @@ class _MyIncidentsScreenState extends State<MyIncidentsScreen> {
                                 _incidents[index].estado == 'clasificado'
                             ? () => _autoAssign(_incidents[index].id)
                             : null,
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          '/incident-detail',
-                          arguments: _incidents[index].id,
-                        ),
+                        onTap: () {
+                          if (_incidents[index].id < 0 || _incidents[index].estado == 'pendiente_sync') {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Incidente pendiente de sincronización. No se puede ver el detalle aún.')),
+                            );
+                            return;
+                          }
+                          Navigator.pushNamed(
+                            context,
+                            '/incident-detail',
+                            arguments: _incidents[index].id,
+                          );
+                        },
                       ),
                     ),
             ),

@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AnalyticsService, DashboardKPIs } from '../../services/analytics.service';
 import { ChartConfiguration, ChartData, ChartType } from 'chart.js';
@@ -11,10 +11,12 @@ import { BaseChartDirective } from 'ng2-charts';
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   analyticsService = inject(AnalyticsService);
   kpis: DashboardKPIs | null = null;
   loading = true;
+  refreshInterval: any;
+  lastUpdated: Date | null = null;
 
   // Pie
   public pieChartOptions: ChartConfiguration['options'] = {
@@ -44,9 +46,23 @@ export class DashboardComponent implements OnInit {
   };
 
   ngOnInit(): void {
+    this.loadData();
+    this.refreshInterval = setInterval(() => {
+      this.loadData();
+    }, 30000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+    }
+  }
+
+  loadData(): void {
     this.analyticsService.getDashboardKPIs().subscribe({
       next: (data) => {
         this.kpis = data;
+        this.lastUpdated = new Date();
         
         // Categoria (Pie)
         const categorias = data.incidentes_por_categoria || {};

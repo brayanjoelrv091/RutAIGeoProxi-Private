@@ -208,6 +208,7 @@ class _AuthGateState extends State<_AuthGate> {
     final token = await ApiClient.getToken();
     if (!mounted) return;
     if (token != null && token.isNotEmpty) {
+      SyncManager().startAutoSync(token);
       Navigator.pushReplacementNamed(context, '/home');
     } else {
       Navigator.pushReplacementNamed(context, '/login');
@@ -250,8 +251,15 @@ class _LoginWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return LoginScreen(
-      onLoginSuccess: () =>
-          Navigator.pushReplacementNamed(context, '/home'),
+      onLoginSuccess: () async {
+        final token = await ApiClient.getToken();
+        if (token != null && token.isNotEmpty) {
+          SyncManager().startAutoSync(token);
+        }
+        if (context.mounted) {
+          Navigator.pushReplacementNamed(context, '/home');
+        }
+      },
     );
   }
 }

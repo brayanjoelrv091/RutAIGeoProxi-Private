@@ -99,6 +99,9 @@ class SyncManager {
         syncNow(token);
       }
     });
+    if (_connectivity.isOnline && !_isSyncing) {
+      syncNow(token);
+    }
   }
 
   /// Detiene el auto-sync.

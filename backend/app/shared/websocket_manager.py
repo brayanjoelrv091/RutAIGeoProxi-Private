@@ -24,9 +24,15 @@ class ConnectionManager:
                 del self.active_connections[reference_id]
 
     async def send_personal_message(self, message: dict, reference_id: str):
-        if reference_id in self.active_connections:
-            for connection in self.active_connections[reference_id]:
-                await connection.send_json(message)
+        await self.broadcast_to_room(message, reference_id)
+
+    async def broadcast_to_room(self, message: dict, room_id: str):
+        if room_id in self.active_connections:
+            for connection in self.active_connections[room_id]:
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    pass
 
     async def broadcast(self, message: dict):
         for connections in self.active_connections.values():

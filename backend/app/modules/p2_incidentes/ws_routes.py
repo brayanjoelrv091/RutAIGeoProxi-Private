@@ -2,7 +2,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from sqlalchemy.orm import Session
 from app.shared.database import SessionLocal
 from app.shared.security import jwt_payload_safe
-from app.shared.websockets import manager
+from app.shared.websocket_manager import manager
 import json
 
 ws_router = APIRouter()

@@ -469,6 +469,7 @@ class WorkshopService:
             ).first()
             if incidente:
                 incidente.estado = "en_proceso"
+                incidente.tenant_id = solicitud.taller.tenant_id
         elif payload.estado == "atendido":
             incidente = db.query(Incidente).filter(
                 Incidente.id == solicitud.incidente_id
@@ -481,7 +482,7 @@ class WorkshopService:
 
         # CU16 - Notificar al cliente dueño del incidente
         from app.modules.p5_pagos.services import NotificationService
-        from app.shared.websockets import manager
+        from app.shared.websocket_manager import manager
         import asyncio
 
         incidente = db.query(Incidente).filter(Incidente.id == solicitud.incidente_id).first()

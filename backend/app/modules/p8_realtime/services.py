@@ -159,7 +159,7 @@ class OfflineSyncService:
         # ── Notificar a los talleres (Simulando push/WS) ──
         try:
             from app.modules.p3_talleres.models import Taller, SolicitudServicio
-            from app.shared.websockets import manager
+            from app.shared.websocket_manager import manager
             from app.modules.p1_usuarios.models import Usuario
 
             # Buscar tenant del cliente

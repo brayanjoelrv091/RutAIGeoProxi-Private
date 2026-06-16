@@ -200,7 +200,7 @@ class IncidentService:
         if background_tasks:
             from app.modules.p3_talleres.models import Taller
             from app.modules.p5_pagos.services import NotificationService
-            from app.shared.websockets import manager
+            from app.shared.websocket_manager import manager
             import asyncio
             
             # Si el cliente tiene tenant_id, filtramos por él, si no, tomamos todos los activos (o cercanos)
@@ -429,7 +429,7 @@ class IncidentService:
     async def update_estado(db: Session, incident_id: int, nuevo_estado: str, tenant_id: int | None = None) -> dict:
         """CU-25: Cambiar el estado del incidente con validación y broadcast."""
         from fastapi import HTTPException
-        from app.shared.websockets import manager
+        from app.shared.websocket_manager import manager
 
         incidente = db.query(Incidente).filter(Incidente.id == incident_id).first()
         if not incidente:

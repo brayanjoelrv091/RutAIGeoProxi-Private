@@ -149,6 +149,7 @@ class AssignmentService:
 
         # 7. Actualizar estado del incidente
         incidente.estado = "asignado"
+        incidente.tenant_id = next(t.tenant_id for t in talleres if t.id == best.taller_id)
 
         db.commit()
         db.refresh(asignacion)
@@ -242,6 +243,7 @@ class AssignmentService:
         db.add(solicitud)
         
         incidente.estado = "asignado"
+        incidente.tenant_id = taller.tenant_id
         db.commit()
         db.refresh(asignacion)
         

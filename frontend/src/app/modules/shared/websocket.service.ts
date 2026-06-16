@@ -12,6 +12,7 @@ export class WebSocketService {
   private trackingSubject: Subject<any> = new Subject();
   private notificationSubject: Subject<any> = new Subject();
   private socket: WebSocket | null = null;
+  private notificationSocket: WebSocket | null = null;
 
   constructor() {}
 
@@ -53,15 +54,21 @@ export class WebSocketService {
    * Incluye token de autenticación.
    */
   connectNotifications(userId: number): Observable<any> {
-    const token = this.getToken();
-    const url = token
-      ? `${this.wsUrl}/payments/ws/notifications/${userId}?token=${encodeURIComponent(token)}`
-      : `${this.wsUrl}/payments/ws/notifications/${userId}`;
-    const notificationSocket = new WebSocket(url);
+    if (!this.notificationSocket || this.notificationSocket.readyState !== WebSocket.OPEN) {
+      const token = this.getToken();
+      const url = token
+        ? `${this.wsUrl}/payments/ws/notifications/${userId}?token=${encodeURIComponent(token)}`
+        : `${this.wsUrl}/payments/ws/notifications/${userId}`;
+      this.notificationSocket = new WebSocket(url);
 
-    notificationSocket.onmessage = (event) => {
-      this.notificationSubject.next(JSON.parse(event.data));
-    };
+      this.notificationSocket.onmessage = (event) => {
+        this.notificationSubject.next(JSON.parse(event.data));
+      };
+      
+      this.notificationSocket.onclose = () => {
+        this.notificationSocket = null;
+      };
+    }
 
     return this.notificationSubject.asObservable();
   }

@@ -3,6 +3,9 @@ import { CommonModule } from '@angular/common';
 import { AnalyticsService, DashboardKPIs } from '../../services/analytics.service';
 import { ChartConfiguration, ChartData, ChartType } from 'chart.js';
 import { BaseChartDirective } from 'ng2-charts';
+import { AuthService } from '../../p1_usuarios/auth.service';
+import { WebSocketService } from '../../shared/websocket.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard',
@@ -17,6 +20,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   loading = true;
   refreshInterval: any;
   lastUpdated: Date | null = null;
+  
+  private auth = inject(AuthService);
+  private ws = inject(WebSocketService);
+  private wsSubscription?: Subscription;
 
   // Pie
   public pieChartOptions: ChartConfiguration['options'] = {
@@ -50,11 +57,32 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.refreshInterval = setInterval(() => {
       this.loadData();
     }, 30000);
+
+    const token = this.auth.token;
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        const userId = parseInt(payload.sub, 10);
+        if (userId) {
+          this.wsSubscription = this.ws.connectNotifications(userId).subscribe((notif) => {
+            // Actualizar dashboard inmediatamente si hay un cambio relevante
+            if (notif.type === 'nuevo_incidente' || notif.type === 'ESTADO_UPDATED' || (notif.titulo && notif.titulo.toLowerCase().includes('incidente'))) {
+              this.loadData();
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Error suscribiéndose a notificaciones en dashboard', e);
+      }
+    }
   }
 
   ngOnDestroy(): void {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
+    }
+    if (this.wsSubscription) {
+      this.wsSubscription.unsubscribe();
     }
   }
 
